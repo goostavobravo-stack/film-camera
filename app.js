@@ -43,7 +43,12 @@ const els = {
   galleryClose: $('gallery-close'),
   gallerySaveAll: $('gallery-save-all'),
   viewer: $('viewer'),
-  viewerImg: $('viewer-img'),
+  viewerStage: $('viewer-stage'),
+  viewerTrack: $('viewer-track'),
+  viewerSlides: [...document.querySelectorAll('#viewer-track img')],
+  viewerPrev: $('viewer-prev'),
+  viewerNext: $('viewer-next'),
+  viewerPos: $('viewer-pos'),
   viewerCaption: $('viewer-caption'),
   viewerBack: $('viewer-back'),
   viewerDelete: $('viewer-delete'),
@@ -684,27 +689,139 @@ async function makeThumb(canvas) {
   return new Promise((resolve) => c.toBlob((b) => resolve(b), 'image/jpeg', 0.8));
 }
 
-function openViewer(shot) {
-  viewing = shot;
+// --- перегляд кадру зі свайпом ----------------------------------------------------
+// Порядок як у сітці: найновіший перший. Свайп вліво веде до старішого кадру, вправо до новішого.
+
+const viewOrder = () => [...state.roll].reverse();
+const viewIndex = () => viewOrder().findIndex((s) => s.id === viewing.id);
+
+function fullUrl(shot) {
   const u = urlsOf(shot.id);
   if (!u.full) u.full = URL.createObjectURL(shot.blob);
-  els.viewerImg.src = u.full;
-  els.viewerCaption.textContent = shot.caption || '';
-  els.viewer.hidden = false;
+  return u.full;
 }
 
-function closeViewer() {
-  if (viewing) {
-    const u = objectUrls.get(viewing.id);
-    if (u && u.full) {
+/** Зсув стрічки слайдів: dx пікселів від центрального положення. */
+function setTrack(dx, animate) {
+  els.viewerTrack.classList.toggle('anim', animate);
+  els.viewerTrack.style.transform = `translateX(calc(-100% + ${dx}px))`;
+}
+
+/** Слайди: новіший, поточний, старіший. Повнорозмірні адреси інших кадрів звільняємо. */
+function renderViewer() {
+  const order = viewOrder();
+  const i = viewIndex();
+  const shots = [order[i - 1], order[i], order[i + 1]];
+  const keep = new Set(shots.filter(Boolean).map((s) => s.id));
+  for (const [id, u] of objectUrls) {
+    if (u.full && !keep.has(id)) {
       URL.revokeObjectURL(u.full);
       u.full = null;
     }
   }
+  els.viewerSlides.forEach((img, k) => {
+    if (shots[k]) img.src = fullUrl(shots[k]);
+    else img.removeAttribute('src');
+  });
+  els.viewerCaption.textContent = viewing.caption || '';
+  els.viewerPos.textContent = `${i + 1} / ${order.length}`;
+  els.viewerPrev.hidden = i <= 0;
+  els.viewerNext.hidden = i >= order.length - 1;
+  setTrack(0, false);
+}
+
+function openViewer(shot) {
+  viewing = shot;
+  els.viewer.hidden = false;
+  renderViewer();
+}
+
+function closeViewer() {
+  objectUrls.forEach((u) => {
+    if (u.full) {
+      URL.revokeObjectURL(u.full);
+      u.full = null;
+    }
+  });
   viewing = null;
   els.viewer.hidden = true;
-  els.viewerImg.removeAttribute('src');
+  els.viewerSlides.forEach((img) => img.removeAttribute('src'));
 }
+
+let navigating = false;
+
+/** dir = 1: до старішого кадру, -1: до новішого. Якщо далі нікуди, стрічка пружинить назад. */
+function go(dir) {
+  if (!viewing || navigating) return;
+  const order = viewOrder();
+  const j = viewIndex() + dir;
+  if (j < 0 || j >= order.length) return setTrack(0, true);
+  navigating = true;
+  setTrack(-dir * els.viewerStage.clientWidth, true);
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    clearTimeout(fallback);
+    els.viewerTrack.removeEventListener('transitionend', finish);
+    viewing = order[j];
+    renderViewer();
+    navigating = false;
+  };
+  const fallback = setTimeout(finish, 450); // якщо transitionend не спрацював
+  els.viewerTrack.addEventListener('transitionend', finish);
+}
+
+let swipe = null;
+
+els.viewerStage.addEventListener('pointerdown', (e) => {
+  if (navigating || e.target.closest('.viewer-nav')) return;
+  swipe = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), dx: 0, horizontal: null };
+});
+
+els.viewerStage.addEventListener('pointermove', (e) => {
+  if (!swipe || e.pointerId !== swipe.id) return;
+  const dx = e.clientX - swipe.x;
+  const dy = e.clientY - swipe.y;
+  if (swipe.horizontal === null) {
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+    swipe.horizontal = Math.abs(dx) > Math.abs(dy);
+    if (swipe.horizontal) {
+      try {
+        els.viewerStage.setPointerCapture(e.pointerId);
+      } catch { /* без захоплення свайп усе одно працює */ }
+    }
+  }
+  if (!swipe.horizontal) return;
+  const i = viewIndex();
+  const atEdge = (dx > 0 && i <= 0) || (dx < 0 && i >= state.roll.length - 1);
+  swipe.dx = atEdge ? dx * 0.3 : dx; // на краю стрічка пручається
+  setTrack(swipe.dx, false);
+});
+
+function endSwipe(e) {
+  if (!swipe || e.pointerId !== swipe.id) return;
+  const s = swipe;
+  swipe = null;
+  if (!s.horizontal) return;
+  const width = els.viewerStage.clientWidth;
+  const speed = s.dx / Math.max(1, performance.now() - s.t); // px/мс
+  const far = Math.abs(s.dx) > width * 0.2;
+  const flick = Math.abs(speed) > 0.5 && Math.abs(s.dx) > 30;
+  if (far || flick) go(s.dx < 0 ? 1 : -1);
+  else setTrack(0, true);
+}
+els.viewerStage.addEventListener('pointerup', endSwipe);
+els.viewerStage.addEventListener('pointercancel', endSwipe);
+
+els.viewerPrev.addEventListener('click', () => go(-1));
+els.viewerNext.addEventListener('click', () => go(1));
+document.addEventListener('keydown', (e) => {
+  if (els.viewer.hidden) return;
+  if (e.key === 'ArrowLeft') go(-1);
+  else if (e.key === 'ArrowRight') go(1);
+  else if (e.key === 'Escape') closeViewer();
+});
 
 els.galleryBtn.addEventListener('click', () => {
   renderGallery();
@@ -715,15 +832,23 @@ els.gallerySaveAll.addEventListener('click', () => deliver(state.roll));
 els.viewerBack.addEventListener('click', closeViewer);
 els.viewerSave.addEventListener('click', () => (viewing ? deliver([viewing]) : undefined));
 els.viewerDelete.addEventListener('click', () => {
-  if (!viewing || !confirm('Видалити цей кадр?')) return;
+  if (!viewing || navigating || !confirm('Видалити цей кадр?')) return;
   const { id, name } = viewing;
-  closeViewer();
+  const order = viewOrder();
+  const i = viewIndex();
+  const next = order[i + 1] || order[i - 1]; // після видалення показуємо сусідній кадр
   state.roll = state.roll.filter((s) => s.id !== id);
   if (state.last && state.last.name === name) state.last = null;
   forgetUrls(id);
   deleteShot(id);
   renderRollButton();
   renderGallery();
+  if (next) {
+    viewing = next;
+    renderViewer();
+  } else {
+    closeViewer();
+  }
 });
 
 loadShots().then((shots) => {

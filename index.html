@@ -119,7 +119,16 @@
   </section>
 
   <section class="viewer" id="viewer" hidden aria-label="Кадр">
-    <div class="viewer-stage"><img id="viewer-img" alt=""></div>
+    <div class="viewer-stage" id="viewer-stage">
+      <div class="viewer-track" id="viewer-track">
+        <div class="slide"><img alt=""></div>
+        <div class="slide"><img alt=""></div>
+        <div class="slide"><img alt=""></div>
+      </div>
+      <button type="button" class="viewer-nav prev" id="viewer-prev" aria-label="Новіший кадр">‹</button>
+      <button type="button" class="viewer-nav next" id="viewer-next" aria-label="Старіший кадр">›</button>
+    </div>
+    <p class="viewer-pos" id="viewer-pos"></p>
     <p class="print-caption" id="viewer-caption"></p>
     <div class="print-bar">
       <button type="button" id="viewer-back" class="ios-btn">Назад</button>
