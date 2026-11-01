@@ -3,7 +3,7 @@ import { FILMS, developFilm } from './films.js';
 import { FilmPipeline, MAX_OUTPUT_SIZE, computeParams, formatDateStamp, loadLut } from './pipeline.js';
 import { newSeed, rollFrame } from './random.js';
 import { clearShots, deleteShot, loadShots, saveShot } from './store.js';
-import { buildPreviewParams, finderMarkup } from './viewfinder.js';
+import { buildPreviewParams, finderHtml, glassStyle } from './viewfinder.js';
 
 const MAX_FRAMES = 36;
 const STORE_KEY = 'film-camera-v1';
@@ -169,7 +169,8 @@ function renderSelection() {
   const film = currentFilm();
   const cam = currentCamera();
   previewSeed = newSeed(); // для «Просрочки» і «Намотки» превʼю показує один можливий результат
-  els.vf.innerHTML = finderMarkup(cam.finder);
+  els.vf.innerHTML = finderHtml(cam);
+  Object.entries(glassStyle(cam.id)).forEach(([k, val]) => els.vf.style.setProperty(k, val));
   els.finder.dataset.finder = cam.finder || '';
   els.controls.classList.toggle('digital', !!cam.digital);
   els.camInfo.textContent = `${cam.name} — ${cam.blurb}`;
@@ -868,6 +869,7 @@ const previewSource = document.createElement('canvas');
 let previewSeed = newSeed();
 let previewCache = { key: '', params: null };
 let lastPreview = 0;
+let previewTick = 0;
 
 const overlaysOpen = () => !els.print.hidden || !els.gallery.hidden || !els.viewer.hidden;
 
@@ -891,6 +893,7 @@ function renderPreview(ts) {
   if (previewCache.key !== key) {
     previewCache = { key, params: buildPreviewParams(currentCamera(), currentFilm(), previewSeed, { flash: state.flash }) };
   }
+  previewCache.params.grainSeed = ++previewTick; // зерно мерехтить, як у кіно, а решта вигляду стабільна
   try {
     previewPipeline.render(previewSource, previewCache.params);
     els.finder.classList.add('live');

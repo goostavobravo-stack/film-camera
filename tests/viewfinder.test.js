@@ -4,7 +4,9 @@ import { CAMERAS } from '../cameras.js';
 import { FILMS } from '../films.js';
 import { computeParams } from '../pipeline.js';
 import { NEUTRAL_FRAME } from '../random.js';
-import { FINDERS, PREVIEW_GRAIN, buildPreviewParams, finderMarkup } from '../viewfinder.js';
+import {
+  FINDERS, GLASS, PREVIEW_GRAIN, buildPreviewParams, finderHtml, finderMarkup, glassFor, glassStyle,
+} from '../viewfinder.js';
 
 test('у кожної камери є тип видошукача з розміткою', () => {
   for (const cam of CAMERAS) {
@@ -25,8 +27,9 @@ test('типи видошукачів відповідають камерам', 
   assert.equal(type('leica-q3'), 'evf');
 });
 
-test('превʼю: без випадкових подій, лише лінза камери й плівка', () => {
+test('превʼю: без випадкових подій, лише лінза камери, скло й плівка', () => {
   for (const cam of CAMERAS) {
+    const glass = glassFor(cam.id);
     for (const film of FILMS) {
       const p = buildPreviewParams(cam, film, 12345);
       assert.equal(p.leak, null);
@@ -34,12 +37,54 @@ test('превʼю: без випадкових подій, лише лінза 
       assert.equal(p.overlay, null);
       assert.equal(p.flash, 0);
       assert.equal(p.exposure, 1, 'без випадкової експозиції');
-      assert.deepEqual(p.wb, [1, 1, 1]);
+      p.wb.forEach((m, i) => assert.ok(Math.abs(m - glass.tint[i]) < 1e-9, 'баланс білого = відтінок скла'));
       assert.equal(p.blurAll, 0);
-      assert.equal(p.vignetteStrength, cam.vignetteStrength);
-      assert.equal(p.barrel, cam.barrelDistortion);
+      assert.ok(Math.abs(p.vignetteStrength - Math.min(1, cam.vignetteStrength + glass.shade)) < 1e-9);
+      assert.ok(Math.abs(p.barrel - (cam.barrelDistortion + glass.bulge)) < 1e-9);
     }
   }
+});
+
+test('скло видошукача: у кожної камери є, ефект ніжний і сталий', () => {
+  for (const cam of CAMERAS) {
+    const g = GLASS[cam.id];
+    assert.ok(g, `${cam.id}: немає скла`);
+    g.tint.forEach((m) => assert.ok(m >= 0.9 && m <= 1.05, `${cam.id}: відтінок ${m} занадто сильний`));
+    assert.ok(g.bulge > 0 && g.bulge <= 0.08, `${cam.id}: випуклість`);
+    assert.ok(g.shade >= 0 && g.shade <= 0.15);
+    assert.ok(g.edge >= 0 && g.edge <= 0.15);
+    assert.ok(g.gloss >= 0 && g.gloss <= 0.2);
+    assert.match(g.coat, /^rgba\(\d+,\d+,\d+,0?\.\d+\)$/);
+  }
+  assert.equal(Object.keys(GLASS).length, CAMERAS.length, 'зайвих записів немає');
+  // різні камери — різне скло
+  const sigs = new Set(CAMERAS.map((c) => JSON.stringify(GLASS[c.id])));
+  assert.equal(sigs.size, CAMERAS.length);
+  // пластикові камери випуклі найсильніше, цифровий EVF найплоскіший
+  assert.ok(GLASS.holga.bulge > GLASS.leica.bulge && GLASS.leica.bulge > GLASS['leica-q3'].bulge);
+  assert.deepEqual(glassFor('nope').tint, [1, 1, 1]);
+});
+
+test('скло не залежить від seed: без рандому', () => {
+  for (const cam of CAMERAS) {
+    const film = FILMS.find((f) => f.id === 'kodak-portra-400');
+    const sig = (seed) => {
+      const p = buildPreviewParams(cam, film, seed);
+      return JSON.stringify([p.wb, p.barrel, p.vignetteStrength, p.blurEdge]);
+    };
+    assert.equal(sig(1), sig(99999));
+  }
+  assert.deepEqual(glassStyle('holga'), glassStyle('holga'));
+});
+
+test('шар скла додається до розмітки видошукача', () => {
+  for (const cam of CAMERAS) {
+    const html = finderHtml(cam);
+    assert.ok(html.endsWith('<div class="vf-glass"></div>'));
+    assert.ok(html.includes(finderMarkup(cam.finder).trim().slice(0, 30)));
+  }
+  const style = glassStyle('olympus-mju2');
+  assert.deepEqual(Object.keys(style).sort(), ['--coat', '--gloss', '--gloss2', '--shade']);
 });
 
 test('превʼю: зерно слабше, ніж на знімку, спалах вмикається', () => {

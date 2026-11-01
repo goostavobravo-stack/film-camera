@@ -230,7 +230,7 @@ button { font: inherit; color: inherit; }
 /* коли превʼю працює, вихідне відео лишається джерелом, але не показується */
 .finder.live canvas#preview { display: block; }
 .finder.live video { opacity: 0; }
-.finder.live .finder-marks { display: none; }
+.finder.live .finder-marks, .finder.live .glare { display: none; }
 .finder[data-finder="toy"] canvas#preview { filter: blur(0.7px) brightness(0.92) contrast(0.95); }
 
 /* --- видошукачі камер --- */
@@ -810,4 +810,14 @@ select.pill option, select.pill optgroup { color: #111; text-shadow: none; }
   .plate #cam-info { display: none; }
   .shutter { width: 76px; height: 76px; }
   .shutter span { width: 54px; height: 54px; }
+}
+
+/* скло видошукача: відблиск, відблиск покриття лінзи й тонке затемнення біля краю; сила задається змінними камери */
+.vf-glass {
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 55% at 24% 14%, rgba(255, 255, 255, var(--gloss, 0)) 0%, transparent 60%),
+    linear-gradient(118deg, transparent 34%, rgba(255, 255, 255, var(--gloss2, 0)) 42%, transparent 50%),
+    radial-gradient(ellipse 60% 50% at 80% 90%, var(--coat, transparent) 0%, transparent 65%);
+  box-shadow: inset 0 0 22px 2px rgba(0, 0, 0, var(--shade, 0)), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }

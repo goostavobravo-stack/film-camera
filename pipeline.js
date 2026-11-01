@@ -11,6 +11,9 @@
 
 import { createRng } from './random.js';
 import { TINT_LIMIT } from './films.js';
+import {
+  GRAIN_REF_WIDTH, GRAIN_TEX_SIGMA, GRAIN_TEX_SIZE, buildGrainTexture, exposureGrainMul, formatGrain,
+} from './grain.js';
 
 export const MAX_OUTPUT_SIZE = 2048;
 
@@ -193,8 +196,9 @@ export function computeParams(camera, film, frame, lutData = null, overlay = nul
     greenCyanBoost: film.greenCyanBoost,
     shadowTint: tintClamp(film.shadowTint),
     highlightTint: tintClamp(film.highlightTint),
-    grainAmount: clamp(film.grainAmount * frame.grainMul, 0, 1),
-    grainSize: film.grainSize,
+    // зерно залежить від експозиції (недоекспозиція зернить сильніше) і формату плівки камери
+    grainAmount: clamp(film.grainAmount * frame.grainMul * exposureGrainMul(exposureEV) * formatGrain(camera).amount, 0, 1),
+    grainSize: film.grainSize * formatGrain(camera).size,
     // 1 = плівкові грудочки, 0 = піксельний шум цифрового сенсора
     grainClump: film.grainClump ?? 1,
     // наскільки зерно різне по каналах: кольорові плівки мають барвникові хмарки, ч/б ні
@@ -359,8 +363,8 @@ void main() {
 
 const FINAL_FRAG = `${PRECISION}
 varying vec2 vUv;
-uniform sampler2D uScene, uGlow, uCurve, uDust, uLut;
-uniform vec2 uRes, uSeed;
+uniform sampler2D uScene, uGlow, uCurve, uDust, uLut, uGrainTex;
+uniform vec2 uRes, uSeed, uGrainSeed;
 uniform float uSharp, uGlowAmt, uExposure, uVigStrength, uVigRadius;
 uniform float uSat, uGCBoost, uGrain, uGrainSize, uGrainClump, uGrainChroma, uHasDust, uLutSize, uLutAmt;
 uniform float uFlash, uFogAmt, uFogMottle;
@@ -384,12 +388,15 @@ float vnoise(vec2 p) {
              mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 
-// Одне поле зерна (середнє 0, розмах ≈ ±0.3). Плівка: м'які грудочки двох масштабів (барвникові хмарки)
-// з невеликою дрібною складовою; цифровий сенсор (uGrainClump = 0): шум на рівні окремих пікселів.
-float grainField(vec2 p, float o) {
-  float fine = (hash12(floor(p) + o) + hash12(floor(p) + o + 19.3)) * 0.5;
-  float soft = (0.58 * vnoise(p * 0.62 + o) + 0.30 * vnoise(p * 0.27 + o * 1.9)) / 0.88;
-  return mix(fine, 0.8 * soft + 0.2 * fine, uGrainClump) - 0.5;
+// Зерно: текстура з чотирма незалежними смуговими полями одиничної дисперсії (див. grain.js). Беремо її двічі
+// з різним масштабом і поворотом, щоб не було видно повторення плитки; сума двох полів ділиться на √2.
+const float GRAIN_GAIN = 1.1; // компенсація згладжування білінійної вибірки
+const float GRAIN_TEX = ${GRAIN_TEX_SIZE}.0;
+const float GRAIN_DECODE = 255.0 / ${GRAIN_TEX_SIGMA}.0;
+vec4 grainFields(vec2 p) {
+  vec4 a = texture2D(uGrainTex, p / GRAIN_TEX) - 0.5;
+  vec4 b = texture2D(uGrainTex, (mat2(0.8, 0.6, -0.6, 0.8) * p * 1.31 + 37.0) / GRAIN_TEX) - 0.5;
+  return (a + b) * GRAIN_DECODE * 0.7071 * GRAIN_GAIN;
 }
 
 vec3 toLin(vec3 c) { return pow(max(c, 0.0), vec3(2.2)); }
@@ -451,6 +458,29 @@ void main() {
   if (uFlash > 0.0) lin *= mix(1.0, 0.45 + 1.6 * exp(-r * r * 1.8), uFlash);
   c = toSrgb(lin);
 
+  // зерно додається до сигналу ДО кривої плівки: пологі ділянки кривої (тінь, плече) його стискають, як у плівки.
+  // Крім того, у тінях його більше (мало світла на зерно), у чистих світлах менше.
+  if (uGrain > 0.0) {
+    vec2 gp = gl_FragCoord.xy / uGrainSize + uGrainSeed;
+    vec3 n;
+    if (uGrainClump > 0.5) {
+      // плівка: незалежні шари барвників (uGrainChroma) плюс спільне срібло
+      vec4 f = grainFields(gp);
+      float k = uGrainChroma;
+      n = mix(vec3(f.a), f.rgb, k) / sqrt((1.0 - k) * (1.0 - k) + k * k);
+    } else {
+      // цифровий сенсор: шум окремих пікселів
+      vec2 px = floor(gl_FragCoord.xy) + uGrainSeed;
+      n = vec3(hash12(px) + hash12(px + 19.3) - 1.0, hash12(px + 41.1) + hash12(px + 63.7) - 1.0,
+               hash12(px + 83.3) + hash12(px + 97.9) - 1.0) * 2.45;
+      n = mix(vec3(dot(n, vec3(0.3333))), n, 0.6);
+    }
+    float Lg = dot(c, LUMA);
+    float w = mix(1.5, 0.55, smoothstep(0.0, 0.85, Lg));
+    w *= (0.55 + 0.45 * smoothstep(0.0, 0.05, Lg)) * (1.0 - 0.5 * smoothstep(0.85, 1.0, Lg));
+    c += n * uGrain * 0.07 * w;
+  }
+
   // крива плівки (tonecurve + канали) і необов'язковий 3D LUT
   c = applyCurve(c);
   if (uLutSize > 0.0) c = mix(c, applyLut(c), uLutAmt);
@@ -468,20 +498,6 @@ void main() {
     float n = 0.5 * vnoise(fp * 2.5) + 0.3 * vnoise(fp * 6.0 + 7.1) + 0.2 * vnoise(fp * 15.0 + 3.7);
     float f = uFogAmt * ((1.0 - uFogMottle) + uFogMottle * n * 1.8) * (0.75 + 0.35 * r);
     c = 1.0 - (1.0 - clamp(c, 0.0, 1.0)) * (1.0 - uFogTint * f);
-  }
-
-  // плівкове зерно: грудочки, трохи різні по каналах, сильніші в тінях і півтонах,
-  // у чистих світлах і глибокому чорному слабші
-  if (uGrain > 0.0) {
-    vec2 gp = gl_FragCoord.xy / uGrainSize + uSeed;
-    float common = grainField(gp, 0.0);
-    vec3 n = mix(vec3(common),
-                 vec3(grainField(gp, 31.7), grainField(gp, 67.3), grainField(gp, 91.1)),
-                 uGrainChroma);
-    float L = dot(c, LUMA);
-    float w = mix(1.6, 0.5, smoothstep(0.0, 0.9, L));
-    w *= (1.0 - 0.55 * smoothstep(0.82, 1.0, L)) * (0.35 + 0.65 * smoothstep(0.0, 0.1, L));
-    c += n * uGrain * 0.5 * w;
   }
 
   // світлова протічка (screen), великий м'який градієнт від краю
@@ -576,6 +592,10 @@ export class FilmPipeline {
     this.curveTex = this._texture(gl.LINEAR);
     this.dustTex = this._texture();
     this.lutTex = this._texture();
+    this.grainTex = this._texture(gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    this._upload(this.grainTex, GRAIN_TEX_SIZE, GRAIN_TEX_SIZE, buildGrainTexture());
     this.blank = new Uint8Array([0, 0, 0, 0]);
     this._upload(this.dustTex, 1, 1, this.blank);
     this._upload(this.lutTex, 1, 1, this.blank);
@@ -873,8 +893,8 @@ export class FilmPipeline {
     if (hasOverlay) this._drawOverlay(p.dust, p.overlay, w, h);
 
     const f = this.progs.final;
-    this._use(f, null, T.scene.tex, T.glowA.tex, this.curveTex, this.dustTex, this.lutTex);
-    ['uScene', 'uGlow', 'uCurve', 'uDust', 'uLut'].forEach((n, i) => gl.uniform1i(loc(f, n), i));
+    this._use(f, null, T.scene.tex, T.glowA.tex, this.curveTex, this.dustTex, this.lutTex, this.grainTex);
+    ['uScene', 'uGlow', 'uCurve', 'uDust', 'uLut', 'uGrainTex'].forEach((n, i) => gl.uniform1i(loc(f, n), i));
     gl.uniform2f(loc(f, 'uRes'), w, h);
     gl.uniform2f(loc(f, 'uSeed'), (p.seed % 4099) * 7.13, ((p.seed >>> 12) % 4093) * 3.71);
     gl.uniform1f(loc(f, 'uSharp'), p.sharpness);
@@ -888,7 +908,11 @@ export class FilmPipeline {
     gl.uniform3fv(loc(f, 'uShadowTint'), p.shadowTint);
     gl.uniform3fv(loc(f, 'uHighTint'), p.highlightTint);
     gl.uniform1f(loc(f, 'uGrain'), p.grainAmount);
-    gl.uniform1f(loc(f, 'uGrainSize'), Math.max(1, p.grainSize * Math.max(1, w / 1000)));
+    // розмір зерна відносно ширини кадру: однаковий вигляд на превʼю й на знімку
+    gl.uniform1f(loc(f, 'uGrainSize'), Math.max(1, (p.grainSize * w) / GRAIN_REF_WIDTH));
+    // у видошукачі зерно мерехтить саме (grainSeed), а решта випадковості лишається стабільною
+    const gs = p.grainSeed ?? p.seed;
+    gl.uniform2f(loc(f, 'uGrainSeed'), (gs % 4099) * 7.13, ((gs >>> 12) % 4093) * 3.71);
     gl.uniform1f(loc(f, 'uGrainClump'), p.grainClump);
     gl.uniform1f(loc(f, 'uGrainChroma'), p.grainChroma);
     gl.uniform1f(loc(f, 'uHasDust'), hasOverlay ? 1 : 0);
