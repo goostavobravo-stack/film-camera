@@ -1,14 +1,13 @@
+/* Скевоморфізм у дусі перших iOS: шкіра зі строчкою, шліфований метал, хром, глянець. */
+
 :root {
-  --leather: #151413;
-  --leather-hi: #1f1d1b;
-  --silver-hi: #efeeea;
-  --silver: #c4c3be;
-  --silver-lo: #8d8c87;
-  --ink: #1b1a18;
-  --cream: #f1e8d4;
-  --amber: #e8a33d;
+  --noise: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  --metal: repeating-linear-gradient(90deg, rgba(255,255,255,.22) 0 1px, rgba(0,0,0,.035) 1px 2px),
+           linear-gradient(180deg, #f6f6f4 0%, #d8d8d5 47%, #bdbdba 53%, #e2e2df 100%);
+  --engrave: #b9b2a3;
+  --cream: #f3ead5;
+  --amber: #ffb02e;
   --red: #c8321f;
-  --gap: 14px;
   color-scheme: dark;
 }
 
@@ -17,125 +16,217 @@
 html, body {
   margin: 0;
   height: 100%;
-  background: #0b0a0a;
+  background: #080706;
   color: var(--cream);
-  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  font-family: "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
   overscroll-behavior: none;
   touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
 }
 
+button { font: inherit; color: inherit; }
+
+/* --- корпус: чорна шкіра --- */
 .camera {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100dvh;
   max-width: 560px;
   margin: 0 auto;
-  background:
-    radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1.3px) 0 0 / 5px 5px,
-    linear-gradient(180deg, var(--leather-hi), var(--leather) 40%);
-  box-shadow: 0 0 0 1px #000, 0 0 60px #000;
+  background-color: #1c1917;
+  background-image:
+    var(--noise),
+    radial-gradient(120% 70% at 50% 0%, rgba(255, 255, 255, 0.07), transparent 60%),
+    radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1.4px);
+  background-size: 180px 180px, 100% 100%, 6px 6px;
+  box-shadow: 0 0 0 1px #000, 0 0 70px #000;
 }
 
-/* --- верхня панель --- */
+/* --- верхня панель: шліфований алюміній --- */
 .top-plate {
+  position: relative;
+  z-index: 2;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: var(--gap);
-  padding: calc(env(safe-area-inset-top) + 12px) 16px 12px;
-  background: linear-gradient(180deg, var(--silver-hi), var(--silver) 55%, #dad9d4);
-  color: var(--ink);
-  border-bottom: 3px solid #000;
-  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.25), 0 6px 14px rgba(0, 0, 0, 0.6);
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 10px) 18px 10px;
+  background: var(--metal);
+  color: #2a2a28;
+  border-bottom: 1px solid #1a1a19;
+  box-shadow: inset 0 1px 0 #fff, inset 0 -1px 0 rgba(0, 0, 0, 0.25), 0 3px 8px rgba(0, 0, 0, 0.75);
 }
+.top-plate::after { /* глянцевий блік на верхній половині */
+  content: "";
+  position: absolute;
+  inset: 0 0 50% 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.05));
+  pointer-events: none;
+}
+.screw {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 6px);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #8d8d8a 60%, #55554f);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+.screw::after { content: ""; position: absolute; left: 1px; right: 1px; top: 3px; height: 1px; background: rgba(0, 0, 0, 0.55); transform: rotate(-30deg); }
+.s1 { left: 6px; }
+.s2 { right: 6px; }
 
+/* механічний лічильник кадрів */
 .counter {
+  position: relative;
+  z-index: 1;
   justify-self: start;
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 2px;
-  padding: 5px 10px 4px;
-  background: #0a0a09;
-  border-radius: 4px;
-  box-shadow: inset 0 2px 5px #000, 0 1px 0 rgba(255, 255, 255, 0.7);
+  padding: 4px 6px 4px 5px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #050505, #1b1b1b);
+  border: 1px solid #000;
+  box-shadow: inset 0 2px 5px #000, 0 1px 0 rgba(255, 255, 255, 0.85), 0 0 0 1px rgba(0, 0, 0, 0.25);
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  color: var(--cream);
 }
-.counter-value { font-size: 26px; font-weight: 600; letter-spacing: 0.04em; line-height: 1; }
-.counter-max { font-size: 12px; opacity: 0.55; }
-.counter.end .counter-value { color: var(--amber); }
+.counter::after { /* скло над барабанами */
+  content: "";
+  position: absolute;
+  inset: 0 0 50% 0;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.03));
+  pointer-events: none;
+}
+.wheel {
+  width: 20px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 3px;
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1;
+  color: #f4ecd8;
+  background: linear-gradient(180deg, #000 0%, #3a3a38 28%, #4c4c49 50%, #2a2a28 72%, #000 100%);
+  box-shadow: inset 0 0 4px #000;
+  text-shadow: 0 1px 2px #000;
+}
+.counter-max { margin-left: 3px; font-size: 11px; color: #8d877b; }
+.counter.end .wheel { color: var(--amber); }
 
 .brand {
+  position: relative;
+  z-index: 1;
   font-size: 13px;
   font-weight: 800;
-  letter-spacing: 0.32em;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+  letter-spacing: 0.3em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
 }
-.brand b { color: var(--red); font-weight: 800; }
+.brand b { color: var(--red); }
 
-.rewind {
-  justify-self: end;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 4px 4px 10px;
-  background: none;
-  border: 0;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-.rewind-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
-.rewind-knob {
-  width: 34px;
-  height: 34px;
+/* --- хромовані круглі кнопки --- */
+.chrome-btn {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  padding: 0;
   border-radius: 50%;
-  background:
-    repeating-conic-gradient(from 0deg, #4a4944 0 6deg, #2d2c29 6deg 12deg);
-  border: 2px solid var(--silver-lo);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.3);
-  transition: transform 0.45s cubic-bezier(.3, .7, .2, 1);
+  border: 1px solid #1a1a19;
+  background: conic-gradient(from 20deg, #fafaf8, #a4a4a1, #f2f2ef, #8f8f8c, #fafaf8);
+  color: #3a3a37;
+  cursor: pointer;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 0 0 2px rgba(255, 255, 255, 0.5);
 }
-.rewind.spin .rewind-knob { transform: rotate(-720deg); }
+.chrome-btn::before { /* вдавлена кришка */
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #3b3b3a 0%, #151515 100%);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.35), inset 0 -2px 3px rgba(0, 0, 0, 0.8);
+}
+.chrome-btn::after { /* глянець */
+  content: "";
+  position: absolute;
+  left: 11px;
+  right: 11px;
+  top: 8px;
+  height: 17px;
+  border-radius: 50% / 100% 100% 0 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+.chrome-btn svg, .chrome-btn span { position: relative; z-index: 1; }
+.chrome-btn svg { width: 24px; height: 24px; fill: #cfcac0; filter: drop-shadow(0 -1px 0 #000); }
+.chrome-btn span { font-size: 13px; font-weight: 800; color: #e8e2d4; text-shadow: 0 -1px 0 #000; letter-spacing: 0.02em; }
+.chrome-btn:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), inset 0 0 0 2px rgba(255, 255, 255, 0.35); }
+.chrome-btn.small { width: 38px; height: 38px; justify-self: end; }
+.chrome-btn.small::before { inset: 5px; }
+.chrome-btn.small::after { left: 8px; right: 8px; top: 6px; height: 11px; }
+.chrome-btn.small svg { width: 17px; height: 17px; }
+.chrome-btn.spin svg { animation: spin 0.5s cubic-bezier(.3, .7, .2, 1); }
+@keyframes spin { to { transform: rotate(-360deg); } }
 
-/* --- корпус і видошукач --- */
+.flash-btn[aria-pressed="true"]::before {
+  background: radial-gradient(circle at 50% 40%, #ffe29a, #ffb02e 55%, #b26a00);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.7), inset 0 -2px 4px rgba(120, 60, 0, 0.7), 0 0 14px 3px rgba(255, 176, 46, 0.6);
+}
+.flash-btn[aria-pressed="true"] svg { fill: #fff7dc; filter: drop-shadow(0 0 4px #fff) drop-shadow(0 -1px 0 #b26a00); }
+
+/* --- видошукач: хромова рамка і скло --- */
 .body {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
-  padding: 14px 16px 6px;
+  gap: 14px;
+  margin: 10px 10px 0;
+  padding: 14px 12px 8px;
+  border-radius: 14px;
+}
+.body::before { /* строчка по краю шкіри */
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  border: 2px dashed rgba(236, 226, 198, 0.55);
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.9));
+  pointer-events: none;
 }
 
+.finder-wrap {
+  padding: 11px;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #f4f5f5 0%, #8d9094 38%, #dcdedf 54%, #686b6f 100%);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.85), inset 0 1px 1px #fff, inset 0 -2px 3px rgba(0, 0, 0, 0.55);
+}
 .finder {
   --ar: 1.5;
   position: relative;
   aspect-ratio: var(--ar);
-  width: min(100%, calc((100dvh - 350px) * var(--ar)));
+  width: min(calc(100vw - 70px), 460px, calc((100dvh - 410px) * var(--ar)));
   background: #000;
-  border-radius: 6px;
-  border: 7px solid #060606;
-  outline: 2px solid var(--silver-lo);
-  box-shadow: 0 0 0 5px #0d0d0c, 0 10px 30px rgba(0, 0, 0, 0.8), inset 0 0 40px rgba(0, 0, 0, 0.6);
+  border-radius: 10px;
+  border: 6px solid #050505;
+  box-shadow: inset 0 0 22px #000, 0 0 0 1px rgba(255, 255, 255, 0.3), 0 1px 0 rgba(255, 255, 255, 0.5);
   overflow: hidden;
 }
-.finder video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+.finder video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .finder-marks {
   position: absolute;
   inset: 10px;
   pointer-events: none;
-  --m: rgba(255, 255, 255, 0.75);
+  --m: rgba(255, 255, 255, 0.65);
   background:
     linear-gradient(var(--m), var(--m)) 0 0 / 16px 1.5px,
     linear-gradient(var(--m), var(--m)) 0 0 / 1.5px 16px,
@@ -147,9 +238,16 @@ html, body {
     linear-gradient(var(--m), var(--m)) 100% 100% / 1.5px 16px;
   background-repeat: no-repeat;
 }
+.glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.05) 36%, transparent 37%);
+}
 .flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
-.flash.go { animation: flash 0.28s ease-out; }
-@keyframes flash { 0% { opacity: 0.9; } 100% { opacity: 0; } }
+.flash.go { animation: flash 0.3s ease-out; }
+.flash.go.strong { animation-duration: 0.55s; }
+@keyframes flash { 0% { opacity: 0.95; } 100% { opacity: 0; } }
 
 .finder-msg {
   position: absolute;
@@ -157,87 +255,190 @@ html, body {
   display: grid;
   place-items: center;
   padding: 18px;
-  background: rgba(0, 0, 0, 0.82);
+  background: rgba(0, 0, 0, 0.84);
   border: 0;
-  color: var(--cream);
-  font: inherit;
   font-size: 15px;
   line-height: 1.4;
   text-align: center;
 }
 .finder-msg[hidden] { display: none; }
 
-/* --- вибір камери / плівки / кадру --- */
-.dials {
-  width: min(100%, 520px);
+/* --- вибір камери й плівки --- */
+.controls {
+  width: min(100%, 500px);
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: 1fr 1.35fr;
   gap: 10px;
 }
-.dial { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.dial-label {
+.well {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.28));
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.well > .pill-wrap, .film-pick, label.well { flex: 1; min-width: 0; }
+label.well { flex-direction: column; align-items: stretch; gap: 5px; }
+.film-pick { display: flex; flex-direction: column; gap: 5px; }
+
+.engrave {
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--silver-lo);
+  color: var(--engrave);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.1);
 }
-.dial select,
-.seg {
+
+.pill-wrap { position: relative; display: block; }
+.pill-wrap::after { /* стрілочка */
+  content: "";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -6px;
+  border-right: 2px solid #eef2f8;
+  border-bottom: 2px solid #eef2f8;
+  transform: rotate(45deg);
+  filter: drop-shadow(0 -1px 0 rgba(0, 0, 0, 0.6));
+  pointer-events: none;
+}
+select.pill {
+  width: 100%;
   height: 40px;
-  border-radius: 6px;
-  border: 1px solid #3a3835;
-  background: #0e0d0c;
-  color: var(--cream);
-  font: inherit;
-  font-size: 15px;
-  box-shadow: inset 0 1px 3px #000, 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-.dial select { width: 100%; padding: 0 10px; appearance: none; -webkit-appearance: none; text-overflow: ellipsis; }
-.seg { display: flex; padding: 3px; gap: 3px; }
-.seg button {
-  padding: 0 12px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--silver-lo);
+  padding: 0 30px 0 12px;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 8px;
+  border: 1px solid #101820;
+  color: #fff;
   font: inherit;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.75);
   cursor: pointer;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.1) 49%, rgba(0, 0, 0, 0.1) 50%, rgba(0, 0, 0, 0.22) 100%),
+    linear-gradient(180deg, #6f819b, #3d4c63);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 1px 0 rgba(255, 255, 255, 0.14), 0 2px 4px rgba(0, 0, 0, 0.7);
 }
-.seg button[aria-pressed="true"] { background: var(--silver); color: var(--ink); }
+select.pill option, select.pill optgroup { color: #111; text-shadow: none; }
 
-/* --- спуск --- */
+/* касета: циліндр із кольоровою етикеткою */
+.canister {
+  --lbl-bg: #f2b705;
+  --lbl-fg: #a3161a;
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 62px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #2a2a28 0%, #d6d6d3 22%, #fff 34%, #9c9c99 58%, #3a3a38 100%);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.canister .cap {
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  height: 9px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #4b4b49, #efefec 30%, #8a8a87 70%, #3b3b39);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+}
+.canister .cap-top { top: -2px; }
+.canister .cap-bottom { bottom: -2px; }
+.can-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 11px;
+  bottom: 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.45) 0%, rgba(255, 255, 255, 0.28) 30%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.5) 100%), var(--lbl-bg);
+  color: var(--lbl-fg);
+  text-align: center;
+  line-height: 1.05;
+}
+.can-label b { font-size: 7.5px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; max-width: 100%; }
+.can-label span { margin-top: 2px; font-size: 11px; font-weight: 900; max-width: 100%; }
+
+.plate {
+  width: min(100%, 500px);
+  padding: 2px 6px;
+  text-align: center;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--engrave);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.plate p { margin: 0; }
+.plate #film-info { color: #d8cfba; font-weight: 600; }
+
+/* --- нижня панель: спалах, спуск, формат --- */
 .bottom {
   display: grid;
-  place-items: center;
-  padding: 10px 16px calc(env(safe-area-inset-bottom) + 18px);
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  justify-items: center;
+  padding: 10px 28px calc(env(safe-area-inset-bottom) + 16px);
 }
+.bottom .flash-btn { justify-self: start; }
+.bottom .format-btn { justify-self: end; }
+
 .shutter {
-  width: 84px;
-  height: 84px;
+  position: relative;
+  width: 88px;
+  height: 88px;
   padding: 0;
   border-radius: 50%;
-  border: 0;
-  background: conic-gradient(from 30deg, #f4f3ef, #9a9993, #f4f3ef, #8a8984, #f4f3ef);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.7), inset 0 0 0 3px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
+  border: 1px solid #111;
+  background: conic-gradient(from 30deg, #fbfbf8, #96968f, #f6f6f2, #84847e, #fbfbf8);
+  box-shadow: 0 7px 14px rgba(0, 0, 0, 0.8), 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 0 0 3px rgba(255, 255, 255, 0.45);
   display: grid;
   place-items: center;
+  cursor: pointer;
+}
+.shutter::before { /* канавка між кільцем і кнопкою */
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: #101010;
+  box-shadow: inset 0 2px 4px #000, 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 .shutter span {
+  position: relative;
   width: 62px;
   height: 62px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #ee6a50, var(--red) 55%, #7d1a0e);
-  box-shadow: inset 0 -3px 6px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.5);
-  transition: transform 0.08s;
+  background: radial-gradient(circle at 50% 30%, #ff8d70 0%, #e0452b 38%, #b02612 70%, #6e1408 100%);
+  box-shadow: inset 0 -4px 7px rgba(0, 0, 0, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.5), 0 2px 3px rgba(0, 0, 0, 0.7);
+  transition: transform 0.08s, box-shadow 0.08s;
 }
-.shutter:active span { transform: scale(0.92) translateY(2px); }
+.shutter span::after { /* глянцевий блік */
+  content: "";
+  position: absolute;
+  left: 11px;
+  right: 11px;
+  top: 5px;
+  height: 22px;
+  border-radius: 50% / 100% 100% 0 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.05));
+}
+.shutter:active span { transform: scale(0.94) translateY(2px); box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.5), 0 0 0 rgba(0, 0, 0, 0); }
 .shutter[aria-disabled="true"] { filter: grayscale(1) brightness(0.55); }
 
-/* --- готовий кадр --- */
+/* --- готовий кадр: без рамок, лише тінь --- */
 .print {
   position: fixed;
   inset: 0;
@@ -245,52 +446,92 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 14px;
-  padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px);
-  background: rgba(8, 7, 7, 0.96);
+  background-color: #2a2622;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.025) 0 2px, rgba(0, 0, 0, 0.05) 2px 4px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.025) 0 2px, rgba(0, 0, 0, 0.05) 2px 4px),
+    radial-gradient(120% 90% at 50% 40%, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.55));
 }
 .print[hidden] { display: none; }
+.print-stage {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  padding: calc(env(safe-area-inset-top) + 16px) 14px 8px;
+}
 .print canvas {
+  display: block;
   max-width: 100%;
-  max-height: calc(100dvh - 190px);
-  background: #fff;
-  border: 10px solid #f3efe6;
-  border-bottom-width: 26px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8);
+  max-height: 100%;
+  border-radius: 2px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(0, 0, 0, 0.6);
   -webkit-touch-callout: default;
   -webkit-user-select: auto;
 }
-.print-caption { margin: 0; font-size: 13px; color: var(--silver-lo); text-align: center; min-height: 1.3em; }
-.print-actions { display: flex; gap: 12px; }
-.btn {
-  min-width: 130px;
-  height: 46px;
-  padding: 0 22px;
-  border-radius: 23px;
-  border: 1px solid var(--silver-lo);
-  background: transparent;
-  color: var(--cream);
-  font: inherit;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
+.print-caption {
+  margin: 0;
+  padding: 4px 18px 10px;
+  max-width: 560px;
+  min-height: 2.8em;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: #c9c0ac;
+  text-shadow: 0 -1px 0 #000;
 }
-.btn.primary { background: var(--cream); color: var(--ink); border-color: var(--cream); }
+.print-bar { /* нижня панель як у iOS 6 */
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px calc(env(safe-area-inset-bottom) + 10px);
+  background: linear-gradient(180deg, #4b4b4d 0%, #2a2a2c 50%, #1b1b1d 51%, #0d0d0e 100%);
+  border-top: 1px solid #000;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.ios-btn {
+  min-width: 110px;
+  height: 38px;
+  padding: 0 20px;
+  border-radius: 7px;
+  border: 1px solid #000;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.7);
+  cursor: pointer;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 49%, rgba(0, 0, 0, 0.1) 50%, rgba(0, 0, 0, 0.2) 100%),
+    linear-gradient(180deg, #7b7d82, #43454a);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.ios-btn.blue {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.12) 49%, rgba(0, 0, 40, 0.1) 50%, rgba(0, 0, 60, 0.25) 100%),
+    linear-gradient(180deg, #4d8de0, #1c53b8);
+  border-color: #0a2252;
+}
+.ios-btn:active { filter: brightness(0.82); }
 
+/* --- підказка (як HUD в iOS) --- */
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom) + 130px);
+  bottom: calc(env(safe-area-inset-bottom) + 150px);
   z-index: 20;
-  transform: translate(-50%, 12px);
-  max-width: calc(100% - 32px);
-  padding: 11px 18px;
-  border-radius: 22px;
-  background: var(--cream);
-  color: var(--ink);
-  font-size: 15px;
+  transform: translate(-50%, 10px);
+  max-width: calc(100% - 40px);
+  padding: 12px 20px;
+  border-radius: 12px;
+  background: rgba(10, 10, 10, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-size: 14px;
   font-weight: 600;
+  text-align: center;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s, transform 0.2s;
@@ -298,11 +539,13 @@ html, body {
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 @media (max-width: 380px) {
-  .rewind-label { display: none; }
-  .brand { letter-spacing: 0.2em; }
+  .brand { letter-spacing: 0.18em; }
+  .controls { grid-template-columns: 1fr; }
+  .finder { width: min(calc(100vw - 70px), calc((100dvh - 500px) * var(--ar))); }
 }
-@media (max-height: 640px) {
-  .finder { width: min(100%, calc((100dvh - 300px) * var(--ar))); }
-  .shutter { width: 70px; height: 70px; }
-  .shutter span { width: 52px; height: 52px; }
+@media (max-height: 700px) {
+  .finder { width: min(calc(100vw - 70px), 460px, calc((100dvh - 370px) * var(--ar))); }
+  .plate #cam-info { display: none; }
+  .shutter { width: 76px; height: 76px; }
+  .shutter span { width: 54px; height: 54px; }
 }

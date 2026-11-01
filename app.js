@@ -1,10 +1,11 @@
 import { CAMERAS } from './cameras.js';
-import { FILMS } from './films.js';
+import { FILMS, developFilm } from './films.js';
 import { FilmPipeline, MAX_OUTPUT_SIZE, computeParams, loadLut } from './pipeline.js';
 import { newSeed, rollFrame } from './random.js';
 
 const MAX_FRAMES = 36;
 const STORE_KEY = 'film-camera-v1';
+const TORCH_WARMUP_MS = 450;
 const demoMode = new URLSearchParams(location.search).has('demo');
 
 const $ = (id) => document.getElementById(id);
@@ -14,12 +15,20 @@ const els = {
   msg: $('finder-msg'),
   flash: $('flash'),
   counter: $('counter'),
-  counterValue: $('counter-value'),
+  wheelTens: $('wheel-tens'),
+  wheelOnes: $('wheel-ones'),
   shutter: $('shutter'),
   rewind: $('rewind'),
   cameraSelect: $('camera-select'),
   filmSelect: $('film-select'),
-  aspectBtns: [...document.querySelectorAll('[data-aspect]')],
+  canister: $('canister'),
+  canisterBrand: $('canister-brand'),
+  canisterName: $('canister-name'),
+  filmInfo: $('film-info'),
+  camInfo: $('cam-info'),
+  flashBtn: $('flash-btn'),
+  formatBtn: $('format-btn'),
+  formatLabel: $('format-label'),
   print: $('print'),
   out: $('out'),
   caption: $('print-caption'),
@@ -33,7 +42,12 @@ const EVENT_NAMES = {
   dust: 'пил і подряпини',
   overexpose: 'засвіт',
   softFocus: "м'який фокус",
+  flash: 'спалах',
 };
+
+const BRAND_SHORT = { Fujifilm: 'Fuji', Lomography: 'Lomo', CineStill: 'Cine' }; // щоб вміщалося на етикетці касети
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // --- налаштування -----------------------------------------------------------
 
@@ -51,6 +65,7 @@ function writeStore() {
       film: state.filmId,
       aspect: state.aspect,
       count: state.count,
+      flash: state.flash,
     }));
   } catch { /* приватний режим: працюємо без збереження */ }
 }
@@ -61,48 +76,105 @@ const state = {
   filmId: FILMS.some((f) => f.id === saved.film) ? saved.film : FILMS[0].id,
   aspect: saved.aspect === '1:1' ? '1:1' : '3:2',
   count: Number.isInteger(saved.count) ? Math.min(Math.max(saved.count, 0), MAX_FRAMES) : 0,
+  flash: saved.flash === true,
+  torch: false, // чи вміє поточна камера вмикати ліхтарик (iOS Safari не вміє)
   busy: false,
   last: null, // { blob, name }
 };
 
 const pipeline = new FilmPipeline(els.out);
 const offscreen = document.createElement('canvas');
+const currentCamera = () => CAMERAS.find((c) => c.id === state.cameraId);
+const currentFilm = () => FILMS.find((f) => f.id === state.filmId);
 
 // --- UI -----------------------------------------------------------------------
 
 let toastTimer;
-function toast(text) {
+function toast(text, ms = 2400) {
   els.toast.textContent = text;
   els.toast.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => els.toast.classList.remove('show'), 2400);
+  toastTimer = setTimeout(() => els.toast.classList.remove('show'), ms);
 }
 
 function renderCounter() {
-  els.counterValue.textContent = String(state.count).padStart(2, '0');
+  const s = String(state.count).padStart(2, '0');
+  els.wheelTens.textContent = s[0];
+  els.wheelOnes.textContent = s[1];
   els.counter.classList.toggle('end', state.count >= MAX_FRAMES);
   els.counter.setAttribute('aria-label', `Знято кадрів: ${state.count} з ${MAX_FRAMES}`);
   els.shutter.setAttribute('aria-disabled', String(state.count >= MAX_FRAMES));
 }
 
-function fillSelect(select, items, current) {
-  select.replaceChildren(...items.map((it) => new Option(it.name, it.id, false, it.id === current)));
+/** Плівки в списку групуються за брендами, камери йдуть списком. */
+function fillCameraSelect() {
+  els.cameraSelect.replaceChildren(
+    ...CAMERAS.map((c) => new Option(c.name, c.id, false, c.id === state.cameraId)),
+  );
+}
+function fillFilmSelect() {
+  const groups = new Map();
+  for (const f of FILMS) {
+    if (!groups.has(f.brand)) groups.set(f.brand, []);
+    groups.get(f.brand).push(f);
+  }
+  els.filmSelect.replaceChildren(
+    ...[...groups].map(([brand, films]) => {
+      const g = document.createElement('optgroup');
+      g.label = brand;
+      g.append(...films.map((f) => new Option(f.name, f.id, false, f.id === state.filmId)));
+      return g;
+    }),
+  );
+}
+
+function renderSelection() {
+  const film = currentFilm();
+  const cam = currentCamera();
+  const [bg, fg] = film.label;
+  els.canister.style.setProperty('--lbl-bg', bg);
+  els.canister.style.setProperty('--lbl-fg', fg);
+  els.canisterBrand.textContent = film.brand === 'Особливі' ? '' : BRAND_SHORT[film.brand] || film.brand;
+  els.canisterName.textContent = film.iso === '?' || film.special === 'reel' ? film.name : `ISO ${film.iso}`;
+  els.filmInfo.textContent = `${film.name} · ISO ${film.iso} — ${film.blurb}`;
+  els.camInfo.textContent = `${cam.name} — ${cam.blurb}`;
+}
+
+function renderFlash() {
+  els.flashBtn.setAttribute('aria-pressed', String(state.flash));
 }
 
 function renderAspect() {
-  els.aspectBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.aspect === state.aspect)));
+  els.formatLabel.textContent = state.aspect;
   updateFinder();
 }
 
-fillSelect(els.cameraSelect, CAMERAS, state.cameraId);
-fillSelect(els.filmSelect, FILMS, state.filmId);
-els.cameraSelect.addEventListener('change', () => { state.cameraId = els.cameraSelect.value; writeStore(); });
-els.filmSelect.addEventListener('change', () => { state.filmId = els.filmSelect.value; writeStore(); });
-els.aspectBtns.forEach((b) => b.addEventListener('click', () => {
-  state.aspect = b.dataset.aspect;
+fillCameraSelect();
+fillFilmSelect();
+els.cameraSelect.addEventListener('change', () => { state.cameraId = els.cameraSelect.value; writeStore(); renderSelection(); });
+els.filmSelect.addEventListener('change', () => { state.filmId = els.filmSelect.value; writeStore(); renderSelection(); });
+
+els.formatBtn.addEventListener('click', () => {
+  state.aspect = state.aspect === '3:2' ? '1:1' : '3:2';
   writeStore();
   renderAspect();
-}));
+});
+
+els.flashBtn.addEventListener('click', () => {
+  state.flash = !state.flash;
+  writeStore();
+  renderFlash();
+  if (state.flash) {
+    toast(
+      state.torch
+        ? 'Спалах увімкнено: підсвітка камери + ефект прямого світла'
+        : 'Спалах імітується обробкою: браузер не керує ліхтариком цієї камери',
+      3200,
+    );
+  } else {
+    toast('Спалах вимкнено');
+  }
+});
 
 els.rewind.addEventListener('click', () => {
   if (state.count === 0) return toast('Плівка вже на початку');
@@ -118,6 +190,7 @@ els.rewind.addEventListener('click', () => {
 // --- камера -------------------------------------------------------------------
 
 let stream = null;
+let startToken = 0;
 
 function showMsg(text, retry) {
   els.msg.textContent = text;
@@ -178,10 +251,9 @@ function createDemoStream() {
       ctx.fillStyle = c;
       ctx.fillRect(w * 0.05 + i * 54, h * 0.83, 46, 46);
     });
-    ctx.fillStyle = '#f4efe2'; // скін-тон
     ctx.beginPath();
     ctx.arc(w * 0.3, h * 0.5, 38, 0, Math.PI * 2);
-    ctx.fillStyle = '#d9a283';
+    ctx.fillStyle = '#d9a283'; // скін-тон
     ctx.fill();
     ctx.strokeStyle = '#fff'; // тонкі лінії для різкості й аберації
     ctx.lineWidth = 2;
@@ -199,7 +271,24 @@ function createDemoStream() {
   return cv.captureStream(30);
 }
 
-let startToken = 0;
+const videoTrack = () => (stream && stream.getVideoTracks()[0]) || null;
+
+function detectTorch() {
+  const track = videoTrack();
+  const caps = track && track.getCapabilities ? track.getCapabilities() : {};
+  state.torch = !!caps.torch;
+}
+
+async function setTorch(on) {
+  const track = videoTrack();
+  if (!track) return false;
+  try {
+    await track.applyConstraints({ advanced: [{ torch: on }] });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function startCamera() {
   const token = ++startToken; // новіший запуск скасовує попередній
@@ -223,6 +312,7 @@ async function startCamera() {
       return;
     }
     stream = s;
+    detectTorch();
     els.video.srcObject = s;
     await els.video.play();
     if (token !== startToken) return;
@@ -325,24 +415,41 @@ async function shoot() {
   if (!els.video.videoWidth) return toast('Камера ще не готова');
 
   state.busy = true;
-  clickSound();
-  if (navigator.vibrate) navigator.vibrate(12);
-  els.flash.classList.remove('go');
-  void els.flash.offsetWidth;
-  els.flash.classList.add('go');
-
+  let torchOn = false;
+  let torchFired = false;
   try {
-    const camera = CAMERAS.find((c) => c.id === state.cameraId);
-    const film = FILMS.find((f) => f.id === state.filmId);
+    // справжній спалах: вмикаємо ліхтарик і чекаємо, поки камера підлаштує експозицію
+    if (state.flash && state.torch) {
+      torchOn = await setTorch(true);
+      if (torchOn) await sleep(TORCH_WARMUP_MS);
+      torchFired = torchOn;
+    }
+
+    clickSound();
+    if (navigator.vibrate) navigator.vibrate(12);
+    els.flash.classList.remove('go', 'strong');
+    void els.flash.offsetWidth;
+    els.flash.classList.add('go');
+    if (state.flash) els.flash.classList.add('strong');
+
+    const camera = currentCamera();
+    const film = currentFilm();
     const g = cropGeometry();
 
     offscreen.width = g.w;
     offscreen.height = g.h;
     offscreen.getContext('2d').drawImage(els.video, g.sx, g.sy, g.sw, g.sh, 0, 0, g.w, g.h);
+    if (torchOn) setTorch(false);
+    torchOn = false;
 
-    const frame = rollFrame(newSeed());
-    const lut = await loadLut(film.lut);
-    const params = computeParams(camera, film, frame, lut);
+    const seed = newSeed();
+    const frame = rollFrame(seed, { flash: state.flash, leakMul: camera.leakMul });
+    // якщо ліхтарик справді світив, імітації потрібно менше
+    if (torchFired) frame.flash *= 0.5;
+
+    const dev = developFilm(film, seed);
+    const lut = await loadLut(dev.film.lut);
+    const params = computeParams(camera, dev.film, frame, lut, dev.overlay);
     pipeline.render(offscreen, params);
     const blob = await pipeline.toBlob('image/jpeg', 0.92);
 
@@ -352,13 +459,14 @@ async function shoot() {
 
     const name = `film-${stamp(new Date())}-${String(state.count).padStart(2, '0')}.jpg`;
     state.last = { blob, name };
-    const shot = { n: state.count, camera: camera.id, film: film.id, frame, params };
+    const shot = { n: state.count, camera: camera.id, film: dev.film.id, developed: dev.info, frame, params };
     window.filmDebug = { ...window.filmDebug, last: shot, pipeline };
-    console.log(`[кадр ${shot.n}] ${camera.id} + ${film.id}`, frame);
+    console.log(`[кадр ${shot.n}] ${camera.id} + ${dev.film.id}`, frame, dev.info || '');
 
     const notes = frame.events.map((e) => EVENT_NAMES[e]).filter(Boolean);
     els.caption.textContent =
       `Кадр ${state.count} з ${MAX_FRAMES} · ${camera.name} · ${film.name}` +
+      (dev.info ? ` (${dev.info.text})` : '') +
       (notes.length ? ` · ${notes.join(', ')}` : '');
     els.print.hidden = false;
     if (state.count >= MAX_FRAMES) toast('Плівка закінчилась');
@@ -366,6 +474,7 @@ async function shoot() {
     console.error(err);
     toast('Не вдалося проявити кадр');
   } finally {
+    if (torchOn) setTorch(false);
     state.busy = false;
   }
 }
@@ -403,6 +512,8 @@ els.close.addEventListener('click', () => { els.print.hidden = true; });
 // --- старт --------------------------------------------------------------------
 
 renderCounter();
+renderSelection();
+renderFlash();
 renderAspect();
 if (!pipeline.supported) {
   showMsg('Цей браузер не підтримує WebGL, тож проявити кадр неможливо.', false);

@@ -153,7 +153,13 @@ export async function loadLut(url) {
 // ---------------------------------------------------------------------------
 
 /** Зводить профіль камери, профіль плівки й випадкові значення кадру в параметри шейдерів. */
-export function computeParams(camera, film, frame, lutData = null) {
+export const IDENTITY_MIX = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+
+/**
+ * overlay — дані для малювання поверх кадру від «особливих» плівок (перфорація, ремджет), див. developFilm.
+ * frame.flash — сила спалаху (0 = без спалаху).
+ */
+export function computeParams(camera, film, frame, lutData = null, overlay = null) {
   const exposureEV = frame.exposureEV + frame.overexposeEV;
   const k = frame.whiteBalanceK / 300;
   const tint = frame.whiteBalanceTint / 5;
@@ -167,12 +173,22 @@ export function computeParams(camera, film, frame, lutData = null) {
     blurAll: sf && sf.mode === 'all' ? sf.amount : 0,
     chromaticAberration: camera.chromaticAberration,
     barrel: camera.barrelDistortion,
-    glowAmount: clamp(camera.glowAmount * (1 + 0.5 * frame.overexposeEV), 0, 1.5),
-    glowThreshold: camera.glowThreshold,
+    // halation плівки додається до свічення лінзи; поріг береться нижчий із двох
+    glowAmount: clamp(camera.glowAmount * (1 + 0.5 * frame.overexposeEV) + (film.halation ?? 0), 0, 1.6),
+    glowThreshold:
+      (film.halation ?? 0) > 0
+        ? Math.min(camera.glowAmount > 0 ? camera.glowThreshold : 1, film.halationThreshold ?? 0.7)
+        : camera.glowThreshold,
+    glowTint: film.halationTint ?? [1, 0.62, 0.42],
     sharpness: camera.sharpness,
 
     exposure: 2 ** exposureEV,
     wb: [1 + 0.07 * k, 1 - 0.04 * tint, 1 - 0.07 * k],
+    mix: film.mix ?? IDENTITY_MIX,
+    flash: frame.flash ?? 0,
+    fog: film.fog ?? 0,
+    fogTint: film.fogTint ?? [0.82, 0.78, 0.84],
+    fogMottle: film.fogMottle ?? 0,
     saturation: film.saturation,
     greenCyanBoost: film.greenCyanBoost,
     shadowTint: tintClamp(film.shadowTint),
@@ -184,6 +200,7 @@ export function computeParams(camera, film, frame, lutData = null) {
 
     leak: frame.leak,
     dust: frame.dust,
+    overlay,
     lut: lutData,
   };
 }
@@ -203,6 +220,7 @@ const smooth = (a, b, x) => {
 export function referenceColor(rgb, p) {
   let lin = rgb.map((v) => toLin(v / 255));
   lin = lin.map((v, i) => v * p.exposure * p.wb[i]);
+  lin = p.mix.map((row) => row[0] * lin[0] + row[1] * lin[1] + row[2] * lin[2]);
   let c = lin.map((v) => clamp(toSrgb(v), 0, 1));
   c = c.map((v, i) => p.curveLUT[Math.round(v * 255) * 4 + i] / 255);
 
@@ -326,16 +344,25 @@ uniform sampler2D uScene, uGlow, uCurve, uDust, uLut;
 uniform vec2 uRes, uSeed;
 uniform float uSharp, uGlowAmt, uExposure, uVigStrength, uVigRadius;
 uniform float uSat, uGCBoost, uGrain, uGrainSize, uHasDust, uLutSize, uLutAmt;
-uniform vec3 uWB, uShadowTint, uHighTint, uLeakColor;
+uniform float uFlash, uFogAmt, uFogMottle;
+uniform vec3 uWB, uShadowTint, uHighTint, uLeakColor, uGlowTint, uFogTint;
 uniform vec4 uLeak; // x, y, size, strength
+uniform mat3 uMix;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
-const vec3 GLOW_TINT = vec3(1.0, 0.62, 0.42);
 
 float hash12(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);
+}
+
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), f.x),
+             mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 
 vec3 toLin(vec3 c) { return pow(max(c, 0.0), vec3(2.2)); }
@@ -386,13 +413,15 @@ void main() {
   }
 
   // halation: червонувате світіння навколо яскравих областей
-  if (uGlowAmt > 0.0) c += texture2D(uGlow, vUv).rgb * GLOW_TINT * uGlowAmt;
+  if (uGlowAmt > 0.0) c += texture2D(uGlow, vUv).rgb * uGlowTint * uGlowAmt;
 
-  // експозиція, баланс білого, віньєтка — у лінійному світлі
-  vec3 lin = toLin(c) * uExposure * uWB;
+  // експозиція, баланс білого, мікс каналів, віньєтка, спалах — у лінійному світлі
+  vec3 lin = uMix * (toLin(c) * uExposure * uWB);
   vec2 q = (vUv - 0.5) * uRes / (0.5 * length(uRes));
   float r = length(q);
   lin *= 1.0 - uVigStrength * smoothstep(uVigRadius * 0.45, uVigRadius * 1.1, r);
+  // пряме світло спалаху: гаряче пятно в центрі, темні краї
+  if (uFlash > 0.0) lin *= mix(1.0, 0.45 + 1.6 * exp(-r * r * 1.8), uFlash);
   c = toSrgb(lin);
 
   // крива плівки (tonecurve + канали) і необов'язковий 3D LUT
@@ -405,6 +434,14 @@ void main() {
   c = vec3(L) + (c - vec3(L)) * s;
   float L2 = dot(c, LUMA);
   c += uShadowTint * (1.0 - smoothstep(0.0, 0.5, L2)) + uHighTint * smoothstep(0.5, 1.0, L2);
+
+  // молочна вуаль прострочених плівок: рівна основа плюс плями, до країв трохи сильніше
+  if (uFogAmt > 0.0) {
+    vec2 fp = vUv * vec2(uRes.x / uRes.y, 1.0) + uSeed * 0.013;
+    float n = 0.5 * vnoise(fp * 2.5) + 0.3 * vnoise(fp * 6.0 + 7.1) + 0.2 * vnoise(fp * 15.0 + 3.7);
+    float f = uFogAmt * ((1.0 - uFogMottle) + uFogMottle * n * 1.8) * (0.75 + 0.35 * r);
+    c = 1.0 - (1.0 - clamp(c, 0.0, 1.0)) * (1.0 - uFogTint * f);
+  }
 
   // зерно в luminance, сильніше в тінях
   if (uGrain > 0.0) {
@@ -581,13 +618,8 @@ export class FilmPipeline {
     else this._upload(this.lutTex, 1, 1, this.blank);
   }
 
-  _drawDust(dust, w, h) {
-    if (!this.dustCanvas) this.dustCanvas = document.createElement('canvas');
-    const cv = this.dustCanvas;
-    cv.width = w;
-    cv.height = h;
-    const ctx = cv.getContext('2d');
-    ctx.clearRect(0, 0, w, h);
+  /** Світлі плями пилу й тонкі подряпини. */
+  _paintDust(ctx, dust, w, h) {
     const rng = createRng(dust.spots.length * 977 + dust.scratches.length);
     dust.spots.forEach((s) => {
       const r = Math.max(1, s.r * w);
@@ -625,6 +657,63 @@ export class FilmPipeline {
       );
       ctx.stroke();
     });
+  }
+
+  /** Темні цятки ремджету (кіноплівка, що пройшла C-41). */
+  _paintRemjet(ctx, specks, w) {
+    specks.forEach((s) => {
+      ctx.fillStyle = `rgba(10,8,6,${s.a})`;
+      ctx.beginPath();
+      ctx.arc(s.x * w, s.y * ctx.canvas.height, Math.max(0.8, s.r * w), 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  /** Смуги кіноплівки зверху й знизу: перфорація й крайовий напис. */
+  _paintSprockets(ctx, sp, w, h) {
+    const t = sp.bar * Math.min(w, h);
+    ctx.fillStyle = 'rgba(12,9,7,0.97)';
+    ctx.fillRect(0, 0, w, t);
+    ctx.fillRect(0, h - t, w, t);
+
+    const hw = t * 0.46;
+    const hh = t * 0.34;
+    const pitch = hw / 0.59;
+    const hole = (x, y) => {
+      const rad = hh * 0.3;
+      ctx.beginPath();
+      ctx.moveTo(x + rad, y);
+      ctx.arcTo(x + hw, y, x + hw, y + hh, rad);
+      ctx.arcTo(x + hw, y + hh, x, y + hh, rad);
+      ctx.arcTo(x, y + hh, x, y, rad);
+      ctx.arcTo(x, y, x + hw, y, rad);
+      ctx.closePath();
+      ctx.fill();
+    };
+    ctx.fillStyle = 'rgba(238,228,205,0.92)';
+    for (let x = -pitch + sp.offset * pitch; x < w; x += pitch) {
+      hole(x, t * 0.14);
+      hole(x, h - t * 0.14 - hh);
+    }
+
+    ctx.fillStyle = 'rgba(255,140,40,0.9)';
+    ctx.font = `${Math.max(8, t * 0.2)}px ui-monospace, Menlo, monospace`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(sp.text, t * 0.4, t * 0.82);
+    ctx.fillText(sp.text, t * 0.4 + sp.offset * w * 0.3, h - t * 0.18);
+  }
+
+  /** Малює в окрему текстуру все, що лежить поверх кадру: пил, ремджет, перфорацію. */
+  _drawOverlay(dust, overlay, w, h) {
+    if (!this.dustCanvas) this.dustCanvas = document.createElement('canvas');
+    const cv = this.dustCanvas;
+    cv.width = w;
+    cv.height = h;
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+    if (overlay && overlay.remjet) this._paintRemjet(ctx, overlay.remjet, w);
+    if (dust) this._paintDust(ctx, dust, w, h);
+    if (overlay && overlay.sprockets) this._paintSprockets(ctx, overlay.sprockets, w, h);
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, this.dustTex);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -689,7 +778,8 @@ export class FilmPipeline {
     // 3. фінал
     this._upload(this.curveTex, 256, 1, p.curveLUT);
     this._setLut(p.lut);
-    if (p.dust) this._drawDust(p.dust, w, h);
+    const hasOverlay = !!(p.dust || (p.overlay && (p.overlay.remjet || p.overlay.sprockets)));
+    if (hasOverlay) this._drawOverlay(p.dust, p.overlay, w, h);
 
     const f = this.progs.final;
     this._use(f, null, T.scene.tex, T.glowA.tex, this.curveTex, this.dustTex, this.lutTex);
@@ -708,7 +798,15 @@ export class FilmPipeline {
     gl.uniform3fv(loc(f, 'uHighTint'), p.highlightTint);
     gl.uniform1f(loc(f, 'uGrain'), p.grainAmount);
     gl.uniform1f(loc(f, 'uGrainSize'), Math.max(1, p.grainSize * Math.max(1, w / 1000)));
-    gl.uniform1f(loc(f, 'uHasDust'), p.dust ? 1 : 0);
+    gl.uniform1f(loc(f, 'uHasDust'), hasOverlay ? 1 : 0);
+    gl.uniform3fv(loc(f, 'uGlowTint'), p.glowTint);
+    gl.uniform1f(loc(f, 'uFlash'), p.flash);
+    gl.uniform1f(loc(f, 'uFogAmt'), p.fog);
+    gl.uniform3fv(loc(f, 'uFogTint'), p.fogTint);
+    gl.uniform1f(loc(f, 'uFogMottle'), p.fogMottle);
+    // матриця в GL — по стовпцях, тому транспонуємо
+    const m = p.mix;
+    gl.uniformMatrix3fv(loc(f, 'uMix'), false, [m[0][0], m[1][0], m[2][0], m[0][1], m[1][1], m[2][1], m[0][2], m[1][2], m[2][2]]);
     gl.uniform1f(loc(f, 'uLutSize'), p.lut ? p.lut.size : 0);
     gl.uniform1f(loc(f, 'uLutAmt'), 1);
     const leak = p.leak;

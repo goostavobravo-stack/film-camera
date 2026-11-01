@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CAMERAS, CAMERA_LIMITS, NEUTRAL_CAMERA } from '../cameras.js';
-import { FILMS, FILM_LIMITS, NEUTRAL_FILM, TINT_LIMIT } from '../films.js';
+import { FILMS, FILM_LIMITS, NEUTRAL_FILM, TINT_LIMIT, developFilm } from '../films.js';
 import { NEUTRAL_FRAME, rollFrame } from '../random.js';
 import { buildCurveLUT, computeParams, makeCurve, parseCube, referenceColor } from '../pipeline.js';
 
@@ -44,14 +44,14 @@ test('вимкнені ефекти: кадр майже не змінюєтьс
 });
 
 test('реальні профілі помітно змінюють кадр', () => {
-  const gray = [128, 128, 128];
+  const gray = [100, 100, 100]; // не рівно середній сірий: деякі S-криві там проходять через пряму
   const neutral = referenceColor(gray, computeParams(NEUTRAL_CAMERA, NEUTRAL_FILM, NEUTRAL_FRAME));
   for (const film of FILMS) {
     const out = referenceColor(gray, computeParams(CAMERAS[0], film, NEUTRAL_FRAME));
     const diff = out.reduce((s, v, i) => s + Math.abs(v - neutral[i]), 0);
     assert.ok(diff > 2, `${film.id}: відмінність ${diff}`);
   }
-  const kodak = FILMS.find((f) => f.id === 'kodak-gold');
+  const kodak = FILMS.find((f) => f.id === 'kodak-gold-200');
   const k = referenceColor([160, 160, 160], computeParams(CAMERAS[0], kodak, NEUTRAL_FRAME));
   assert.ok(k[0] > k[2], 'Kodak Gold тепліший: R > B на сірому');
 });
@@ -96,13 +96,20 @@ test('профілі камер у межах CAMERA_LIMITS', () => {
     }
   }
   const leica = CAMERAS.find((c) => c.id === 'leica');
-  assert.deepEqual(
-    { ...leica, id: undefined, name: undefined },
-    {
-      id: undefined, name: undefined, vignetteStrength: 0.25, vignetteRadius: 1.0, edgeSoftness: 0.3,
-      chromaticAberration: 0.002, barrelDistortion: 0.02, glowAmount: 0.35, glowThreshold: 0.75, sharpness: 0.2,
-    },
-  );
+  const expected = {
+    vignetteStrength: 0.25, vignetteRadius: 1.0, edgeSoftness: 0.3, chromaticAberration: 0.002,
+    barrelDistortion: 0.02, glowAmount: 0.35, glowThreshold: 0.75, sharpness: 0.2,
+  };
+  for (const [k, v] of Object.entries(expected)) assert.equal(leica[k], v, k);
+});
+
+test('камер не менше дев\'яти, id унікальні, leakMul розумний', () => {
+  assert.ok(CAMERAS.length >= 9);
+  assert.equal(new Set(CAMERAS.map((c) => c.id)).size, CAMERAS.length);
+  for (const c of CAMERAS) {
+    assert.ok(c.name && c.blurb);
+    if (c.leakMul !== undefined) assert.ok(c.leakMul >= 1 && c.leakMul <= 4);
+  }
 });
 
 test('профілі плівок у межах FILM_LIMITS і з обмеженим тонуванням', () => {
@@ -136,9 +143,131 @@ test('tonecurve плівок: піднятий чорний, приглушен�
       prev = y;
     }
   }
-  const fuji = makeCurve(FILMS[0].tonecurve);
-  assert.ok(fuji(0.25) < 0.25, 'тіні темніші за пряму');
-  assert.ok(fuji(0.75) > 0.75, 'світла світліші за пряму');
+  for (const film of FILMS) {
+    const f = makeCurve(film.tonecurve);
+    assert.ok(f(0.25) < 0.25, `${film.id}: тіні темніші за пряму`);
+    assert.ok(f(0.75) > 0.75, `${film.id}: світла світліші за пряму`);
+  }
+});
+
+test('каталог плівок: реальні бренди, унікальні id, повні поля', () => {
+  assert.ok(FILMS.length >= 17);
+  assert.equal(new Set(FILMS.map((f) => f.id)).size, FILMS.length);
+  const brands = new Set(FILMS.map((f) => f.brand));
+  for (const b of ['Kodak', 'Fujifilm', 'Ilford', 'CineStill', 'Lomography', 'Agfa', 'Особливі']) {
+    assert.ok(brands.has(b), `немає бренду ${b}`);
+  }
+  for (const f of FILMS) {
+    assert.ok(f.name && f.blurb && f.iso !== undefined, f.id);
+    assert.equal(f.label.length, 2);
+    assert.equal(f.mix.length, 3);
+    f.mix.forEach((row) => assert.equal(row.length, 3));
+  }
+  assert.ok(FILMS.some((f) => f.special === 'expired' && f.name === 'Просрочка'));
+  assert.ok(FILMS.some((f) => f.special === 'reel' && f.name === 'Намотка'));
+});
+
+test('ч/б плівки дають нейтральний сірий з колірного входу', () => {
+  for (const id of ['kodak-tri-x-400', 'ilford-hp5-400']) {
+    const film = FILMS.find((f) => f.id === id);
+    const p = computeParams(NEUTRAL_CAMERA, film, NEUTRAL_FRAME);
+    for (const rgb of [[200, 40, 40], [30, 180, 60], [40, 60, 200], [220, 200, 80]]) {
+      const [r, g, b] = referenceColor(rgb, p);
+      assert.ok(Math.max(r, g, b) - Math.min(r, g, b) < 3, `${id} ${rgb}: ${r} ${g} ${b}`);
+    }
+  }
+});
+
+test('кольорові плівки з міксом зсувають відтінки', () => {
+  const green = [60, 170, 70];
+  const purple = FILMS.find((f) => f.id === 'lomo-purple');
+  const [r, g, b] = referenceColor(green, computeParams(NEUTRAL_CAMERA, purple, NEUTRAL_FRAME));
+  assert.ok(r > green[0] + 30 && b > green[2] + 20, `зелень стає пурпурною: ${r} ${g} ${b}`);
+  const red = FILMS.find((f) => f.id === 'lomo-redscale');
+  const [rr, , bb] = referenceColor([120, 140, 200], computeParams(NEUTRAL_CAMERA, red, NEUTRAL_FRAME));
+  assert.ok(rr > bb + 40, 'редскейл: червоне домінує над синім');
+});
+
+test('halation плівки додається до свічення лінзи', () => {
+  const cine = FILMS.find((f) => f.id === 'cinestill-800t');
+  const bare = computeParams(NEUTRAL_CAMERA, cine, NEUTRAL_FRAME);
+  assert.ok(bare.glowAmount >= 0.6, 'навіть без лінзового свічення гало є');
+  assert.ok(bare.glowThreshold < 0.7);
+  assert.deepEqual(bare.glowTint, cine.halationTint);
+  const withGlow = computeParams(CAMERAS[0], cine, NEUTRAL_FRAME);
+  assert.ok(withGlow.glowAmount > bare.glowAmount);
+  const plain = computeParams(NEUTRAL_CAMERA, NEUTRAL_FILM, NEUTRAL_FRAME);
+  assert.equal(plain.glowAmount, 0);
+});
+
+test('спалах: сила з кадру передається в параметри', () => {
+  assert.equal(computeParams(NEUTRAL_CAMERA, NEUTRAL_FILM, NEUTRAL_FRAME).flash, 0);
+  const p = computeParams(NEUTRAL_CAMERA, NEUTRAL_FILM, { ...NEUTRAL_FRAME, flash: 1.1 });
+  assert.equal(p.flash, 1.1);
+});
+
+test('developFilm: звичайна плівка повертається як є', () => {
+  const film = FILMS[0];
+  const dev = developFilm(film, 123);
+  assert.equal(dev.film, film);
+  assert.equal(dev.overlay, null);
+  assert.equal(dev.info, null);
+});
+
+test('Просрочка: випадкова плівка, прострочена, у межах профілю', () => {
+  const expired = FILMS.find((f) => f.special === 'expired');
+  const bases = new Set();
+  for (let seed = 0; seed < 300; seed++) {
+    const dev = developFilm(expired, seed);
+    assert.deepEqual(dev, developFilm(expired, seed), 'той самий seed — той самий результат');
+    const base = FILMS.find((f) => f.id === dev.info.base);
+    assert.ok(base && !base.special, 'база — звичайна плівка');
+    bases.add(base.id);
+    assert.ok(dev.info.years >= 4 && dev.info.years <= 28);
+
+    const f = dev.film;
+    const fb = makeCurve(f.tonecurve);
+    const bb = makeCurve(base.tonecurve);
+    assert.ok(fb(0) > bb(0) + 0.04, 'чорний піднятий (вуаль)');
+    assert.ok(fb(1) < bb(1), 'білий приглушений');
+    assert.ok(f.fog > 0 && f.fogMottle > 0);
+    assert.ok(f.grainAmount >= Math.min(1, base.grainAmount * 1.3 - 1e-9));
+    assert.ok(f.saturation <= base.saturation);
+    for (const [key, range] of Object.entries(FILM_LIMITS)) assert.ok(within(f[key], range), `${key}=${f[key]}`);
+    for (const pts of [f.tonecurve, f.channelCurves.r, f.channelCurves.g, f.channelCurves.b]) {
+      pts.forEach(([x, y]) => assert.ok(within(x, [0, 1]) && within(y, [0, 1])));
+    }
+    // і весь пайплайн приймає такий профіль
+    const p = computeParams(CAMERAS[0], f, rollFrame(seed), null, dev.overlay);
+    assert.ok(p.grainAmount <= 1);
+  }
+  assert.ok(bases.size >= 8, `різноманітність баз: ${bases.size}`);
+});
+
+test('Намотка: кіноплівка з перфорацією, гало і ремджетом', () => {
+  const reel = FILMS.find((f) => f.special === 'reel');
+  let withRemjet = 0;
+  const codes = new Set();
+  for (let seed = 0; seed < 300; seed++) {
+    const dev = developFilm(reel, seed);
+    assert.deepEqual(dev, developFilm(reel, seed));
+    const sp = dev.overlay.sprockets;
+    assert.ok(sp.bar > 0 && sp.bar < 0.15 && sp.offset >= 0 && sp.offset < 1 && sp.text.length > 10);
+    if (dev.overlay.remjet) {
+      withRemjet++;
+      assert.ok(dev.overlay.remjet.length >= 40 && dev.overlay.remjet.length <= 160);
+      for (const s of dev.overlay.remjet) assert.ok(within(s.x, [0, 1]) && within(s.y, [0, 1]) && within(s.a, [0.35, 0.8]));
+    }
+    codes.add(dev.info.base);
+    const f = dev.film;
+    assert.ok(f.halation >= 0.5, 'сильне гало');
+    for (const [key, range] of Object.entries(FILM_LIMITS)) assert.ok(within(f[key], range), `${key}=${f[key]}`);
+    for (const t of [f.shadowTint, f.highlightTint]) t.forEach((v) => assert.ok(Math.abs(v) <= TINT_LIMIT));
+    const p = computeParams(NEUTRAL_CAMERA, f, NEUTRAL_FRAME, null, dev.overlay);
+    assert.equal(p.overlay, dev.overlay);
+  }
+  assert.ok(withRemjet > 130 && withRemjet < 230, `ремджет у ${withRemjet} з 300`);
+  assert.equal(codes.size, 3, 'усі три кіноплівки трапляються');
 });
 
 test('makeCurve: проходить через контрольні точки і монотонна', () => {

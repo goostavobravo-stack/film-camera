@@ -78,6 +78,34 @@ test('усі значення кадру в межах профілю при б�
   }
 });
 
+test('спалах: сила в межах і не зсуває решту значень кадру', () => {
+  for (let seed = 0; seed < 2000; seed++) {
+    const off = rollFrame(seed);
+    const on = rollFrame(seed, { flash: true });
+    assert.equal(off.flash, 0);
+    assert.ok(within(on.flash, L.flashPower), `flash ${on.flash}`);
+    assert.ok(on.events.includes('flash') && !off.events.includes('flash'));
+    const { flash: _f1, events: _e1, ...restOff } = off;
+    const { flash: _f2, events: _e2, ...restOn } = on;
+    assert.deepEqual(restOn, restOff);
+  }
+});
+
+test('leakMul збільшує шанс світлової протічки, але не понад 60 %', () => {
+  const N = 20000;
+  let normal = 0;
+  let leaky = 0;
+  let extreme = 0;
+  for (let seed = 0; seed < N; seed++) {
+    if (rollFrame(seed).leak) normal++;
+    if (rollFrame(seed, { leakMul: 2.5 }).leak) leaky++;
+    if (rollFrame(seed, { leakMul: 100 }).leak) extreme++;
+  }
+  assert.ok(leaky / N > normal / N * 2, `${leaky} проти ${normal}`);
+  assert.ok(leaky / N > 0.2 && leaky / N < 0.3);
+  assert.ok(extreme / N < 0.63);
+});
+
 test('частоти подій відповідають заданим ймовірностям', () => {
   const N = 40000;
   const count = { leak: 0, dust: 0, over: 0, soft: 0 };

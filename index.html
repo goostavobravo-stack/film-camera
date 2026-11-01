@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <meta name="theme-color" content="#121110">
+  <meta name="theme-color" content="#d4d4d1">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16,55 +16,82 @@
 <body>
   <main class="camera">
     <header class="top-plate">
+      <span class="screw s1" aria-hidden="true"></span>
+      <span class="screw s2" aria-hidden="true"></span>
+
       <div class="counter" id="counter" role="img" aria-label="Лічильник кадрів">
-        <span class="counter-value" id="counter-value">00</span>
+        <span class="wheel" id="wheel-tens">0</span><span class="wheel" id="wheel-ones">0</span>
         <span class="counter-max">/36</span>
       </div>
+
       <div class="brand" aria-hidden="true">ПЛІВКА <b>36</b></div>
-      <button class="rewind" id="rewind" type="button" aria-label="Перемотати плівку">
-        <span class="rewind-knob" aria-hidden="true"></span>
-        <span class="rewind-label">перемотати</span>
+
+      <button class="chrome-btn small rewind" id="rewind" type="button" aria-label="Перемотати плівку">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2L7 6.5 12 11V8a5 5 0 1 1-5 5H5a7 7 0 1 0 7-8z"/></svg>
       </button>
     </header>
 
     <section class="body">
-      <div class="finder" id="finder">
-        <video id="video" playsinline muted autoplay></video>
-        <div class="finder-marks" aria-hidden="true"></div>
-        <div class="flash" id="flash" aria-hidden="true"></div>
-        <button class="finder-msg" id="finder-msg" type="button" hidden></button>
+      <div class="finder-wrap">
+        <div class="finder" id="finder">
+          <video id="video" playsinline muted autoplay></video>
+          <div class="finder-marks" aria-hidden="true"></div>
+          <div class="flash" id="flash" aria-hidden="true"></div>
+          <div class="glare" aria-hidden="true"></div>
+          <button class="finder-msg" id="finder-msg" type="button" hidden></button>
+        </div>
       </div>
 
-      <div class="dials">
-        <label class="dial">
-          <span class="dial-label">Камера</span>
-          <select id="camera-select"></select>
+      <div class="controls">
+        <label class="well">
+          <span class="engrave">Камера</span>
+          <span class="pill-wrap">
+            <select class="pill" id="camera-select"></select>
+          </span>
         </label>
-        <label class="dial">
-          <span class="dial-label">Плівка</span>
-          <select id="film-select"></select>
-        </label>
-        <div class="dial" role="group" aria-label="Формат кадру">
-          <span class="dial-label">Кадр</span>
-          <div class="seg">
-            <button type="button" data-aspect="3:2" aria-pressed="true">3:2</button>
-            <button type="button" data-aspect="1:1" aria-pressed="false">1:1</button>
+
+        <div class="well film-well">
+          <div class="canister" id="canister" aria-hidden="true">
+            <i class="cap cap-top"></i>
+            <div class="can-label"><b id="canister-brand"></b><span id="canister-name"></span></div>
+            <i class="cap cap-bottom"></i>
           </div>
+          <label class="film-pick">
+            <span class="engrave">Плівка</span>
+            <span class="pill-wrap">
+              <select class="pill" id="film-select"></select>
+            </span>
+          </label>
         </div>
+      </div>
+
+      <div class="plate" aria-live="polite">
+        <p id="film-info"></p>
+        <p id="cam-info"></p>
       </div>
     </section>
 
     <footer class="bottom">
+      <button class="chrome-btn flash-btn" id="flash-btn" type="button" aria-pressed="false" aria-label="Спалах">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 5 13.5h5.5L9 22l9.5-12H13z"/></svg>
+      </button>
+
       <button class="shutter" id="shutter" type="button" aria-label="Спуск"><span></span></button>
+
+      <button class="chrome-btn format-btn" id="format-btn" type="button" aria-label="Формат кадру">
+        <span id="format-label">3:2</span>
+      </button>
     </footer>
   </main>
 
   <section class="print" id="print" hidden aria-label="Готовий кадр">
-    <canvas id="out"></canvas>
+    <div class="print-stage">
+      <canvas id="out"></canvas>
+    </div>
     <p class="print-caption" id="print-caption"></p>
-    <div class="print-actions">
-      <button type="button" id="save" class="btn primary">Зберегти</button>
-      <button type="button" id="close" class="btn">Далі</button>
+    <div class="print-bar">
+      <button type="button" id="close" class="ios-btn">Далі</button>
+      <button type="button" id="save" class="ios-btn blue">Зберегти</button>
     </div>
   </section>
 

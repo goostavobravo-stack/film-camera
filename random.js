@@ -60,6 +60,7 @@ export const FRAME_LIMITS = {
   overexposeEV: [0.5, 1],
   softFocusChance: 0.1,
   softFocusAmount: [0.25, 0.7],
+  flashPower: [0.8, 1.2],
 };
 
 /** Кадр без жодного випадкового ефекту. */
@@ -73,6 +74,7 @@ export const NEUTRAL_FRAME = {
   dust: null,
   overexposeEV: 0,
   softFocus: null,
+  flash: 0,
   events: [],
 };
 
@@ -82,8 +84,11 @@ const LEAK_WARM = [1.0, 0.6, 0.15]; // оранжевий
 /**
  * Усі випадкові значення кадру з одного seed. Той самий seed дає той самий результат.
  * Координати пилу — у частках кадру, (0,0) у лівому верхньому куті.
+ *
+ * opts.flash    спалах увімкнено: кадр отримує силу спалаху flashPower
+ * opts.leakMul  множник шансу світлової протічки (дешеві пластикові камери течуть частіше)
  */
-export function rollFrame(seed) {
+export function rollFrame(seed, opts = {}) {
   const rng = createRng(seed);
   const L = FRAME_LIMITS;
   const events = [];
@@ -98,10 +103,11 @@ export function rollFrame(seed) {
     dust: null,
     overexposeEV: 0,
     softFocus: null,
+    flash: 0,
     events,
   };
 
-  const leakChance = rng.uniform(...L.lightLeakChance);
+  const leakChance = Math.min(0.6, rng.uniform(...L.lightLeakChance) * (opts.leakMul ?? 1));
   if (rng.chance(leakChance)) {
     const side = rng.int(0, 3); // 0 ліво, 1 право, 2 верх, 3 низ
     const t = rng.uniform(0.1, 0.9);
@@ -157,6 +163,12 @@ export function rollFrame(seed) {
       amount: rng.uniform(...L.softFocusAmount),
     };
     events.push('softFocus');
+  }
+
+  // останнім, щоб не зсувати решту випадкових значень кадру
+  if (opts.flash) {
+    frame.flash = rng.uniform(...L.flashPower);
+    events.push('flash');
   }
 
   return frame;
