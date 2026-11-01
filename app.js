@@ -334,13 +334,13 @@ function stopCamera() {
 els.msg.addEventListener('click', startCamera);
 els.video.addEventListener('loadedmetadata', updateFinder);
 els.video.addEventListener('resize', updateFinder);
+// Потік не зупиняємо, коли сторінка ховається (листок «Поділитися», перемикання застосунків):
+// новий getUserMedia змушує iOS питати дозвіл знову. Перезапуск лише якщо систему вбила потік.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    startToken++;
-    stopCamera();
-  } else if (pipeline.supported) {
-    startCamera();
-  }
+  if (document.hidden || !pipeline.supported) return;
+  const track = videoTrack();
+  if (!track || track.readyState !== 'live') startCamera();
+  else if (els.video.paused) els.video.play().catch(() => {});
 });
 
 // --- геометрія кадру ----------------------------------------------------------
