@@ -91,26 +91,6 @@ test('спалах: сила в межах і не зсуває решту зн�
   }
 });
 
-test('цифрова камера: стабільна експозиція, жодних плівкових подій', () => {
-  const D = L.digital;
-  for (let seed = 0; seed < 5000; seed++) {
-    const f = rollFrame(seed, { digital: true });
-    assert.ok(within(f.exposureEV, D.exposureEV));
-    assert.ok(within(f.whiteBalanceK, D.whiteBalanceK));
-    assert.ok(within(f.whiteBalanceTint, D.whiteBalanceTint));
-    assert.ok(within(f.grainMul, D.grainMul));
-    assert.equal(f.leak, null);
-    assert.equal(f.dust, null);
-    assert.equal(f.overexposeEV, 0);
-    assert.equal(f.softFocus, null);
-    assert.deepEqual(f.events, []);
-    assert.deepEqual(f, rollFrame(seed, { digital: true }), 'відтворюваність');
-    const withFlash = rollFrame(seed, { digital: true, flash: true });
-    assert.ok(within(withFlash.flash, L.flashPower));
-    assert.deepEqual(withFlash.events, ['flash']);
-  }
-});
-
 test('leakMul збільшує шанс світлової протічки, але не понад 60 %', () => {
   const N = 20000;
   let normal = 0;

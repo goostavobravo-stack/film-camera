@@ -120,14 +120,11 @@ test('амплітуда зерна реалістична: у півтонах 
   assert.ok(GRAIN_STRENGTH <= 0.06);
 });
 
-test('зерно: плівки грудкуваті й кольорові, ч/б без кольорового зерна, цифровий сенсор піксельний', () => {
+test('зерно: кольорові плівки мають кольорове зерно, ч/б без нього', () => {
   for (const film of FILMS) {
     const p = computeParams(CAMERAS[0], film, NEUTRAL_FRAME);
-    assert.equal(p.grainClump, 1, `${film.id}: плівкові грудочки`);
     assert.ok(p.grainChroma >= 0 && p.grainChroma <= 1);
     if (film.saturation === 0) assert.equal(p.grainChroma, 0, `${film.id}: ч/б без хроматичного зерна`);
     else assert.ok(p.grainChroma > 0, `${film.id}: барвникові хмарки`);
   }
-  const q3 = CAMERAS.find((c) => c.id === 'leica-q3');
-  assert.equal(computeParams(q3, q3.look, NEUTRAL_FRAME).grainClump, 0);
 });

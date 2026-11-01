@@ -199,8 +199,6 @@ export function computeParams(camera, film, frame, lutData = null, overlay = nul
     // зерно залежить від експозиції (недоекспозиція зернить сильніше) і формату плівки камери
     grainAmount: clamp(film.grainAmount * frame.grainMul * exposureGrainMul(exposureEV) * formatGrain(camera).amount, 0, 1),
     grainSize: film.grainSize * formatGrain(camera).size,
-    // 1 = плівкові грудочки, 0 = піксельний шум цифрового сенсора
-    grainClump: film.grainClump ?? 1,
     // наскільки зерно різне по каналах: кольорові плівки мають барвникові хмарки, ч/б ні
     grainChroma: film.grainChroma ?? (film.saturation === 0 ? 0 : 0.3),
     seed: frame.seed,
@@ -366,7 +364,7 @@ varying vec2 vUv;
 uniform sampler2D uScene, uGlow, uCurve, uDust, uLut, uGrainTex;
 uniform vec2 uRes, uSeed, uGrainSeed;
 uniform float uSharp, uGlowAmt, uExposure, uVigStrength, uVigRadius;
-uniform float uSat, uGCBoost, uGrain, uGrainSize, uGrainClump, uGrainChroma, uHasDust, uLutSize, uLutAmt;
+uniform float uSat, uGCBoost, uGrain, uGrainSize, uGrainChroma, uHasDust, uLutSize, uLutAmt;
 uniform float uFlash, uFogAmt, uFogMottle;
 uniform vec3 uWB, uShadowTint, uHighTint, uLeakColor, uGlowTint, uFogTint;
 uniform vec4 uLeak; // x, y, size, strength
@@ -462,19 +460,10 @@ void main() {
   // Крім того, у тінях його більше (мало світла на зерно), у чистих світлах менше.
   if (uGrain > 0.0) {
     vec2 gp = gl_FragCoord.xy / uGrainSize + uGrainSeed;
-    vec3 n;
-    if (uGrainClump > 0.5) {
-      // плівка: незалежні шари барвників (uGrainChroma) плюс спільне срібло
-      vec4 f = grainFields(gp);
-      float k = uGrainChroma;
-      n = mix(vec3(f.a), f.rgb, k) / sqrt((1.0 - k) * (1.0 - k) + k * k);
-    } else {
-      // цифровий сенсор: шум окремих пікселів
-      vec2 px = floor(gl_FragCoord.xy) + uGrainSeed;
-      n = vec3(hash12(px) + hash12(px + 19.3) - 1.0, hash12(px + 41.1) + hash12(px + 63.7) - 1.0,
-               hash12(px + 83.3) + hash12(px + 97.9) - 1.0) * 2.45;
-      n = mix(vec3(dot(n, vec3(0.3333))), n, 0.6);
-    }
+    // незалежні шари барвників (uGrainChroma) плюс спільне срібло
+    vec4 f = grainFields(gp);
+    float k = uGrainChroma;
+    vec3 n = mix(vec3(f.a), f.rgb, k) / sqrt((1.0 - k) * (1.0 - k) + k * k);
     float Lg = dot(c, LUMA);
     float w = mix(1.5, 0.55, smoothstep(0.0, 0.85, Lg));
     w *= (0.55 + 0.45 * smoothstep(0.0, 0.05, Lg)) * (1.0 - 0.5 * smoothstep(0.85, 1.0, Lg));
@@ -911,7 +900,6 @@ export class FilmPipeline {
     // розмір зерна відносно ширини кадру: однаковий вигляд на превʼю й на знімку
     gl.uniform1f(loc(f, 'uGrainSize'), grainCellPx(p.grainSize, w));
     gl.uniform2f(loc(f, 'uGrainSeed'), (p.seed % 4099) * 7.13, ((p.seed >>> 12) % 4093) * 3.71);
-    gl.uniform1f(loc(f, 'uGrainClump'), p.grainClump);
     gl.uniform1f(loc(f, 'uGrainChroma'), p.grainChroma);
     gl.uniform1f(loc(f, 'uHasDust'), hasOverlay ? 1 : 0);
     gl.uniform3fv(loc(f, 'uGlowTint'), p.glowTint);

@@ -352,12 +352,6 @@ button { font: inherit; color: inherit; }
   grid-template-columns: 0.78fr 1.6fr;
   gap: 10px;
 }
-/* цифрова камера: плівки немає, вибір камери на всю ширину */
-.controls.digital { grid-template-columns: 1fr; }
-.controls.digital .film-well { display: none; }
-
-.counter.off .wheel { color: #5b574d; }
-
 .well {
   display: flex;
   align-items: center;

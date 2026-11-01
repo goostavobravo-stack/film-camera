@@ -50,46 +50,6 @@ export const CAMERAS = [
     sharpness: 0.2,
   },
   {
-    // Цифрова камера: без плівки. Власний «Leica Look» живе в look і замінює профіль плівки.
-    id: 'leica-q3',
-    name: 'Leica Q3',
-    digital: true,
-    blurb: 'цифрова повнокадрова, Summilux 28 f/1.7: різка, глибокі чорні, чистий колір',
-    vignetteStrength: 0.14,
-    vignetteRadius: 1.1,
-    edgeSoftness: 0.04,
-    chromaticAberration: 0.0003,
-    barrelDistortion: 0,
-    glowAmount: 0.06,
-    glowThreshold: 0.92,
-    sharpness: 0.65,
-    look: {
-      id: 'leica-q3-look',
-      name: 'Leica Look',
-      brand: 'Leica',
-      iso: 100,
-      // щільний контраст: глибокі чорні, чисті світла, без піднятого чорного як у плівки
-      tonecurve: [[0, 0], [0.1, 0.06], [0.25, 0.19], [0.5, 0.5], [0.75, 0.83], [0.9, 0.94], [1, 1]],
-      channelCurves: {
-        r: [[0, 0], [0.5, 0.51], [1, 1]],
-        g: [[0, 0], [0.5, 0.5], [1, 1]],
-        b: [[0, 0], [0.5, 0.488], [1, 1]],
-      },
-      mix: [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-      saturation: 1.06,
-      greenCyanBoost: 0,
-      shadowTint: [0, 0, 0.004],
-      highlightTint: [0.004, 0.002, 0],
-      grainAmount: 0.05, // шум сенсора, а не зерно
-      grainSize: 0.5,
-      grainClump: 0, // піксельний шум, без плівкових грудочок
-      halation: 0,
-      fog: 0,
-      fogMottle: 0,
-      lut: null,
-    },
-  },
-  {
     id: 'contax-t2',
     name: 'Contax T2',
     blurb: 'гострий Zeiss, високий контраст',

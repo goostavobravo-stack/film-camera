@@ -93,7 +93,6 @@ function writeStore() {
       count: state.count,
       flash: state.flash,
       date: state.date,
-      digitalCount: state.digitalCount,
     }));
   } catch { /* приватний режим: працюємо без збереження */ }
 }
@@ -106,8 +105,7 @@ const state = {
   count: Number.isInteger(saved.count) ? Math.min(Math.max(saved.count, 0), MAX_FRAMES) : 0,
   flash: saved.flash === true,
   date: saved.date !== false, // штамп дати за замовчуванням увімкнений
-  roll: [], // кадри поточної плівки (дублюються в IndexedDB): { id, n, name, blob, thumb, caption, digital, time }
-  digitalCount: Number.isInteger(saved.digitalCount) ? saved.digitalCount : 0, // лічильник кадрів цифрової камери
+  roll: [], // кадри поточної плівки (дублюються в IndexedDB): { id, n, name, blob, thumb, caption, time }
   torch: false, // чи вміє поточна камера вмикати ліхтарик (iOS Safari не вміє)
   busy: false,
   last: null, // { blob, name }
@@ -131,30 +129,17 @@ function toast(text, ms = 2400) {
 }
 
 function renderCounter() {
-  const digital = currentCamera().digital;
-  // на цифровій камері плівки немає: лічильник погашений, спуск не блокується
-  const s = digital ? '--' : String(state.count).padStart(2, '0');
+  const s = String(state.count).padStart(2, '0');
   els.wheelTens.textContent = s[0];
   els.wheelOnes.textContent = s[1];
-  els.counter.classList.toggle('off', !!digital);
-  els.counter.classList.toggle('end', !digital && state.count >= MAX_FRAMES);
-  els.counter.setAttribute(
-    'aria-label',
-    digital ? 'Цифрова камера: плівка не використовується' : `Знято кадрів: ${state.count} з ${MAX_FRAMES}`,
-  );
-  els.shutter.setAttribute('aria-disabled', String(!digital && state.count >= MAX_FRAMES));
+  els.counter.classList.toggle('end', state.count >= MAX_FRAMES);
+  els.counter.setAttribute('aria-label', `Знято кадрів: ${state.count} з ${MAX_FRAMES}`);
+  els.shutter.setAttribute('aria-disabled', String(state.count >= MAX_FRAMES));
 }
 
 function renderSelection() {
   const film = currentFilm();
   const cam = currentCamera();
-  els.controls.classList.toggle('digital', !!cam.digital);
-  requestAnimationFrame(() => filmDrum.sync()); // після появи/зникнення барабана прокрутка збивається
-  els.camInfo.textContent = `${cam.name} — ${cam.blurb}`;
-  if (cam.digital) {
-    els.filmInfo.textContent = `${cam.name}: цифровий сенсор, плівка не використовується`;
-    return;
-  }
   const [bg, fg] = film.label;
   els.canister.style.setProperty('--lbl-bg', bg);
   els.canister.style.setProperty('--lbl-fg', fg);
@@ -231,10 +216,9 @@ els.flashBtn.addEventListener('click', () => {
 
 /** Перемотка: кадри стрічки видаляються, лічильники скидаються. Викликається, коли важіль дотягнуто до кінця. */
 function rewindAll() {
-  if (state.count === 0 && state.digitalCount === 0 && state.roll.length === 0) return toast('Плівка вже на початку');
+  if (state.count === 0 && state.roll.length === 0) return toast('Плівка вже на початку');
   const removed = state.roll.length;
   state.count = 0;
-  state.digitalCount = 0;
   writeStore();
   renderCounter();
   clearRoll();
@@ -512,7 +496,7 @@ function stamp(d) {
 
 async function shoot() {
   if (state.busy) return;
-  if (!currentCamera().digital && state.count >= MAX_FRAMES) return toast('Плівка закінчилась');
+  if (state.count >= MAX_FRAMES) return toast('Плівка закінчилась');
   if (!pipeline.supported) return toast('WebGL недоступний на цьому пристрої');
   if (!els.video.videoWidth) return toast('Камера ще не готова');
 
@@ -543,7 +527,7 @@ async function shoot() {
     if (state.flash) els.flash.classList.add('strong');
 
     const camera = currentCamera();
-    const film = camera.digital ? camera.look : currentFilm(); // цифрова камера має власний «look» замість плівки
+    const film = currentFilm();
     const g = cropGeometry();
 
     offscreen.width = g.w;
@@ -556,7 +540,7 @@ async function shoot() {
     // без плівки (Null) нічого випадкового не буває: ні протічок, ні пилу, ні зсуву експозиції
     const frame = film.id === 'null'
       ? { ...NEUTRAL_FRAME, seed, flash: state.flash ? 1 : 0, events: state.flash ? ['flash'] : [] }
-      : rollFrame(seed, { flash: state.flash, leakMul: camera.leakMul, digital: camera.digital });
+      : rollFrame(seed, { flash: state.flash, leakMul: camera.leakMul });
     // якщо ліхтарик справді світив, імітації потрібно менше
     if (torchFired) frame.flash *= 0.5;
 
@@ -571,10 +555,8 @@ async function shoot() {
     const blob = await pipeline.toBlob('image/jpeg', 0.92);
     const thumb = await makeThumb(els.out);
 
-    // цифрові кадри мають окремий лічильник, плівку вони не витрачають
-    let n;
-    if (camera.digital) n = state.digitalCount += 1;
-    else n = state.count += 1;
+    state.count += 1;
+    const n = state.count;
     writeStore();
     renderCounter();
 
@@ -586,9 +568,7 @@ async function shoot() {
 
     const notes = frame.events.map((e) => EVENT_NAMES[e]).filter(Boolean);
     els.caption.textContent =
-      (camera.digital
-        ? `Кадр ${n} · ${camera.name} · цифровий сенсор, ${film.name}`
-        : `Кадр ${n} з ${MAX_FRAMES} · ${camera.name} · ${film.name}`) +
+      `Кадр ${n} з ${MAX_FRAMES} · ${camera.name} · ${film.name}` +
       (dev.info ? ` (${dev.info.text})` : '') +
       (notes.length ? ` · ${notes.join(', ')}` : '');
     addToRoll({
@@ -598,11 +578,10 @@ async function shoot() {
       blob,
       thumb,
       caption: els.caption.textContent,
-      digital: !!camera.digital,
       time: Date.now(),
     });
     els.print.hidden = false;
-    if (!camera.digital && state.count >= MAX_FRAMES) toast('Плівка закінчилась');
+    if (state.count >= MAX_FRAMES) toast('Плівка закінчилась');
   } catch (err) {
     console.error(err);
     toast('Не вдалося проявити кадр');
