@@ -195,6 +195,10 @@ export function computeParams(camera, film, frame, lutData = null, overlay = nul
     highlightTint: tintClamp(film.highlightTint),
     grainAmount: clamp(film.grainAmount * frame.grainMul, 0, 1),
     grainSize: film.grainSize,
+    // 1 = плівкові грудочки, 0 = піксельний шум цифрового сенсора
+    grainClump: film.grainClump ?? 1,
+    // наскільки зерно різне по каналах: кольорові плівки мають барвникові хмарки, ч/б ні
+    grainChroma: film.grainChroma ?? (film.saturation === 0 ? 0 : 0.3),
     seed: frame.seed,
     curveLUT: buildCurveLUT(film),
 
@@ -358,7 +362,7 @@ varying vec2 vUv;
 uniform sampler2D uScene, uGlow, uCurve, uDust, uLut;
 uniform vec2 uRes, uSeed;
 uniform float uSharp, uGlowAmt, uExposure, uVigStrength, uVigRadius;
-uniform float uSat, uGCBoost, uGrain, uGrainSize, uHasDust, uLutSize, uLutAmt;
+uniform float uSat, uGCBoost, uGrain, uGrainSize, uGrainClump, uGrainChroma, uHasDust, uLutSize, uLutAmt;
 uniform float uFlash, uFogAmt, uFogMottle;
 uniform vec3 uWB, uShadowTint, uHighTint, uLeakColor, uGlowTint, uFogTint;
 uniform vec4 uLeak; // x, y, size, strength
@@ -378,6 +382,14 @@ float vnoise(vec2 p) {
   f = f * f * (3.0 - 2.0 * f);
   return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), f.x),
              mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+
+// Одне поле зерна (середнє 0, розмах ≈ ±0.3). Плівка: м'які грудочки двох масштабів (барвникові хмарки)
+// з невеликою дрібною складовою; цифровий сенсор (uGrainClump = 0): шум на рівні окремих пікселів.
+float grainField(vec2 p, float o) {
+  float fine = (hash12(floor(p) + o) + hash12(floor(p) + o + 19.3)) * 0.5;
+  float soft = (0.58 * vnoise(p * 0.62 + o) + 0.30 * vnoise(p * 0.27 + o * 1.9)) / 0.88;
+  return mix(fine, 0.8 * soft + 0.2 * fine, uGrainClump) - 0.5;
 }
 
 vec3 toLin(vec3 c) { return pow(max(c, 0.0), vec3(2.2)); }
@@ -458,12 +470,18 @@ void main() {
     c = 1.0 - (1.0 - clamp(c, 0.0, 1.0)) * (1.0 - uFogTint * f);
   }
 
-  // зерно в luminance, сильніше в тінях
+  // плівкове зерно: грудочки, трохи різні по каналах, сильніші в тінях і півтонах,
+  // у чистих світлах і глибокому чорному слабші
   if (uGrain > 0.0) {
-    vec2 gp = floor(gl_FragCoord.xy / uGrainSize) + uSeed;
-    float n = (hash12(gp) + hash12(gp + 17.3) + hash12(gp + 41.7)) / 3.0 - 0.5;
-    float w = mix(1.6, 0.5, smoothstep(0.0, 0.9, dot(c, LUMA)));
-    c += n * uGrain * 0.45 * w;
+    vec2 gp = gl_FragCoord.xy / uGrainSize + uSeed;
+    float common = grainField(gp, 0.0);
+    vec3 n = mix(vec3(common),
+                 vec3(grainField(gp, 31.7), grainField(gp, 67.3), grainField(gp, 91.1)),
+                 uGrainChroma);
+    float L = dot(c, LUMA);
+    float w = mix(1.6, 0.5, smoothstep(0.0, 0.9, L));
+    w *= (1.0 - 0.55 * smoothstep(0.82, 1.0, L)) * (0.35 + 0.65 * smoothstep(0.0, 0.1, L));
+    c += n * uGrain * 0.5 * w;
   }
 
   // світлова протічка (screen), великий м'який градієнт від краю
@@ -871,6 +889,8 @@ export class FilmPipeline {
     gl.uniform3fv(loc(f, 'uHighTint'), p.highlightTint);
     gl.uniform1f(loc(f, 'uGrain'), p.grainAmount);
     gl.uniform1f(loc(f, 'uGrainSize'), Math.max(1, p.grainSize * Math.max(1, w / 1000)));
+    gl.uniform1f(loc(f, 'uGrainClump'), p.grainClump);
+    gl.uniform1f(loc(f, 'uGrainChroma'), p.grainChroma);
     gl.uniform1f(loc(f, 'uHasDust'), hasOverlay ? 1 : 0);
     gl.uniform3fv(loc(f, 'uGlowTint'), p.glowTint);
     gl.uniform1f(loc(f, 'uFlash'), p.flash);
