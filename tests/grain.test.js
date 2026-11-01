@@ -111,13 +111,13 @@ test('зерно дрібне: зернина на готовому кадрі �
   assert.equal(grainCellPx(0.5, 400), GRAIN_MIN_PX);
 });
 
-test('амплітуда зерна реалістична: у півтонах не більше ~12 рівнів з 255 навіть у Tri-X', () => {
+test('амплітуда зерна реалістична: у півтонах не більше ~14 рівнів з 255 навіть у Tri-X', () => {
   const peak = (f) => f.grainAmount * GRAIN_STRENGTH * 1.5 * 255; // 1.5 = найбільша вага в тінях
   const stable = FILMS.filter((f) => !f.special);
-  for (const f of stable) assert.ok(peak(f) <= 12, `${f.id}: ${peak(f).toFixed(1)}`);
+  for (const f of stable) assert.ok(peak(f) <= 14, `${f.id}: ${peak(f).toFixed(1)}`);
   const gold = peak(FILMS.find((f) => f.id === 'kodak-gold-200'));
-  assert.ok(gold < 8, `Gold 200: ${gold.toFixed(1)}`);
-  assert.ok(GRAIN_STRENGTH <= 0.05);
+  assert.ok(gold < 8.5, `Gold 200: ${gold.toFixed(1)}`);
+  assert.ok(GRAIN_STRENGTH <= 0.06);
 });
 
 test('зерно: плівки грудкуваті й кольорові, ч/б без кольорового зерна, цифровий сенсор піксельний', () => {

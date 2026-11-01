@@ -32,7 +32,7 @@ export const GRAIN_PX_PER_SIZE = 0.9;
 /** Менше за це зерно перетворюється на дрібний цифровий пісок, тому нижче не опускаємося. */
 export const GRAIN_MIN_PX = 0.85;
 /** Сила зерна в сигналі (частка діапазону) при grainAmount = 1 для півтонів. */
-export const GRAIN_STRENGTH = 0.045;
+export const GRAIN_STRENGTH = 0.056;
 /** Одне σ шуму в байтах текстури (128 ± 40·σ). Шейдер знає це число. */
 export const GRAIN_TEX_SIGMA = 40;
 
