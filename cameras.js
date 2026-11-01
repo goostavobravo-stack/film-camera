@@ -30,6 +30,13 @@ export const NEUTRAL_CAMERA = {
 
 export const CAMERAS = [
   {
+    // Чистий режим: жодних оптичних ефектів. Разом з плівкою Null кадр лишається таким, як його віддав iPhone.
+    ...NEUTRAL_CAMERA,
+    id: 'iphone',
+    name: 'iPhone',
+    blurb: 'без оптичних ефектів: кадр як його віддав телефон',
+  },
+  {
     id: 'leica',
     name: 'Leica M6',
     blurb: 'м\'який мікроконтраст, ледь помітна віньєтка',

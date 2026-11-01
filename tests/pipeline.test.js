@@ -65,7 +65,7 @@ test('вимкнені ефекти: кадр майже не змінюєтьс
 test('реальні профілі помітно змінюють кадр', () => {
   const gray = [100, 100, 100]; // не рівно середній сірий: деякі S-криві там проходять через пряму
   const neutral = referenceColor(gray, computeParams(NEUTRAL_CAMERA, NEUTRAL_FILM, NEUTRAL_FRAME));
-  for (const film of FILMS) {
+  for (const film of FILMS.filter((f) => f.id !== 'null')) {
     const out = referenceColor(gray, computeParams(CAMERAS[0], film, NEUTRAL_FRAME));
     const diff = out.reduce((s, v, i) => s + Math.abs(v - neutral[i]), 0);
     assert.ok(diff > 2, `${film.id}: відмінність ${diff}`);
@@ -143,7 +143,7 @@ test('Leica Q3: цифрова камера з власним look заміст�
   assert.equal(p.leak, null);
   // тіні глибші, ніж у плівки з піднятим чорним
   const q = referenceColor([40, 40, 40], computeParams(NEUTRAL_CAMERA, look, NEUTRAL_FRAME));
-  const gold = referenceColor([40, 40, 40], computeParams(NEUTRAL_CAMERA, FILMS[0], NEUTRAL_FRAME));
+  const gold = referenceColor([40, 40, 40], computeParams(NEUTRAL_CAMERA, FILMS.find((f) => f.id === 'kodak-gold-200'), NEUTRAL_FRAME));
   assert.ok(q[0] < gold[0], `Q3 ${q[0]} глибше за плівку ${gold[0]}`);
 });
 
@@ -175,7 +175,7 @@ test('профілі плівок у межах FILM_LIMITS і з обмежен
 });
 
 test('tonecurve плівок: піднятий чорний, приглушений білий, S-форма', () => {
-  for (const film of FILMS) {
+  for (const film of FILMS.filter((f) => f.id !== 'null')) {
     const f = makeCurve(film.tonecurve);
     assert.ok(f(0) > 0, `${film.id}: чорний піднятий`);
     assert.ok(f(1) < 1, `${film.id}: білий приглушений`);
@@ -187,7 +187,7 @@ test('tonecurve плівок: піднятий чорний, приглушен�
       prev = y;
     }
   }
-  for (const film of FILMS) {
+  for (const film of FILMS.filter((f) => f.id !== 'null')) {
     const f = makeCurve(film.tonecurve);
     assert.ok(f(0.25) < 0.25, `${film.id}: тіні темніші за пряму`);
     assert.ok(f(0.75) > 0.75, `${film.id}: світла світліші за пряму`);
@@ -238,7 +238,7 @@ test('halation плівки додається до свічення лінзи'
   assert.ok(bare.glowAmount >= 0.6, 'навіть без лінзового свічення гало є');
   assert.ok(bare.glowThreshold < 0.7);
   assert.deepEqual(bare.glowTint, cine.halationTint);
-  const withGlow = computeParams(CAMERAS[0], cine, NEUTRAL_FRAME);
+  const withGlow = computeParams(CAMERAS.find((c) => c.id === 'leica'), cine, NEUTRAL_FRAME);
   assert.ok(withGlow.glowAmount > bare.glowAmount);
   const plain = computeParams(NEUTRAL_CAMERA, NEUTRAL_FILM, NEUTRAL_FRAME);
   assert.equal(plain.glowAmount, 0);
@@ -251,7 +251,7 @@ test('спалах: сила з кадру передається в парам�
 });
 
 test('developFilm: звичайна плівка повертається як є', () => {
-  const film = FILMS[0];
+  const film = FILMS.find((f) => f.id === 'kodak-gold-200');
   const dev = developFilm(film, 123);
   assert.equal(dev.film, film);
   assert.equal(dev.overlay, null);
@@ -374,4 +374,37 @@ test('parseCube: відхиляє зіпсовані файли', () => {
   assert.throws(() => parseCube('LUT_3D_SIZE 2\n0 0 0\n'), /кількість/);
   assert.throws(() => parseCube('0 0 0\n'), /LUT_3D_SIZE/);
   assert.throws(() => parseCube('LUT_1D_SIZE 16\n0 0 0'), /1D/);
+});
+
+test('чистий режим: камера iPhone й плівка Null нічого не змінюють', () => {
+  const iphone = CAMERAS.find((c) => c.id === 'iphone');
+  const none = FILMS.find((f) => f.id === 'null');
+  assert.ok(iphone && none);
+  assert.equal(CAMERAS[0].id, 'iphone', 'iPhone першим у барабані');
+  assert.equal(FILMS[0].id, 'null', 'Null першим у барабані');
+  for (const [k, range] of Object.entries(CAMERA_LIMITS)) assert.ok(within(iphone[k], range), k);
+  // усі ефекти камери на нулі
+  for (const k of ['vignetteStrength', 'edgeSoftness', 'chromaticAberration', 'barrelDistortion', 'glowAmount', 'sharpness']) {
+    assert.equal(iphone[k], 0, k);
+  }
+  const p = computeParams(iphone, none, NEUTRAL_FRAME);
+  assert.equal(p.grainAmount, 0);
+  assert.equal(p.glowAmount, 0);
+  assert.equal(p.fog, 0);
+  assert.equal(p.saturation, 1);
+  assert.deepEqual(p.shadowTint.concat(p.highlightTint), [0, 0, 0, 0, 0, 0]);
+  let worst = 0;
+  for (const rgb of colorGrid()) {
+    const out = referenceColor(rgb, p);
+    rgb.forEach((v, i) => { worst = Math.max(worst, Math.abs(out[i] - v)); });
+  }
+  assert.ok(worst <= 1, `відхилення ${worst} з 255`);
+});
+
+test('плівка Null не потрапляє в «Просрочку» й не має спеціальної обробки', () => {
+  const none = FILMS.find((f) => f.id === 'null');
+  assert.equal(none.special, undefined);
+  assert.equal(developFilm(none, 5).film, none);
+  const expired = FILMS.find((f) => f.special === 'expired');
+  for (let seed = 0; seed < 300; seed++) assert.notEqual(developFilm(expired, seed).info.base, 'null');
 });

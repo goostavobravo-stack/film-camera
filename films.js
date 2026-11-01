@@ -371,7 +371,19 @@ const SPECIALS = [
   },
 ];
 
-export const FILMS = [...STOCKS, ...SPECIALS];
+/** «Плівка Null»: без плівки. Разом з камерою iPhone дає чистий кадр, такий, як його віддав телефон. */
+export const NULL_FILM = {
+  ...NEUTRAL_FILM,
+  id: 'null',
+  brand: 'Без ефектів',
+  name: 'Null',
+  iso: '—',
+  blurb: 'без плівки: колір і зерно не змінюються',
+  label: ['#2a2a2a', '#b9b9b5'],
+};
+
+/** Список для барабана: Null першим, далі реальні плівки й особливі. */
+export const FILMS = [NULL_FILM, ...STOCKS, ...SPECIALS];
 
 // ---------------------------------------------------------------------------
 // Особливі плівки

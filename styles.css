@@ -48,10 +48,6 @@ button { font: inherit; color: inherit; }
 .top-plate {
   position: relative;
   z-index: 2;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 12px;
   padding: calc(env(safe-area-inset-top) + 10px) 18px 10px;
   background: var(--metal);
   color: #2a2a28;
@@ -128,6 +124,89 @@ button { font: inherit; color: inherit; }
 }
 .brand b { color: var(--red); }
 
+.plate-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; }
+.plate-row .brand { margin-left: auto; }
+
+/* --- важіль перемотки: протягніть ручку зліва направо --- */
+.lever {
+  --p: 0;
+  position: relative;
+  z-index: 1;
+  height: 36px;
+  margin-top: 9px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #8f8f8b, #b6b6b2 45%, #cfcfcb);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.9);
+  overflow: hidden;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.lever:focus-visible { outline: 2px solid #b36a00; outline-offset: 2px; }
+.lever::before { /* зубці храповика на доріжці */
+  content: "";
+  position: absolute;
+  left: 56px;
+  right: 14px;
+  bottom: 6px;
+  height: 4px;
+  opacity: 0.5;
+  background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.35) 0 1.5px, transparent 1.5px 8%);
+  pointer-events: none;
+}
+.lever-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--p) * 100%);
+  background: linear-gradient(180deg, #ffd27a, #ff9f1c);
+  box-shadow: 2px 0 6px rgba(255, 150, 20, 0.55);
+  opacity: 0.85;
+}
+.lever-label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-left: 56px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #3a3a37;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+  opacity: calc(1 - var(--p) * 1.4);
+  pointer-events: none;
+}
+.lever-knob {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 50px;
+  height: 28px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  cursor: grab;
+  touch-action: none;
+  will-change: transform;
+  background: linear-gradient(180deg, #fbfbf8 0%, #d9d9d5 45%, #a9a9a4 55%, #e4e4e0 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6), inset 0 1px 0 #fff, inset 0 -2px 3px rgba(0, 0, 0, 0.3);
+}
+.lever.dragging .lever-knob { cursor: grabbing; }
+.lever-knob i {
+  width: 7px;
+  height: 7px;
+  border-top: 2px solid #4a4a46;
+  border-right: 2px solid #4a4a46;
+  transform: rotate(45deg);
+  opacity: 0.75;
+  margin-left: -2px;
+}
+
 /* --- хромовані круглі кнопки --- */
 .chrome-btn {
   position: relative;
@@ -167,14 +246,13 @@ button { font: inherit; color: inherit; }
 .chrome-btn svg { width: 24px; height: 24px; fill: #cfcac0; filter: drop-shadow(0 -1px 0 #000); }
 .chrome-btn span { font-size: 13px; font-weight: 800; color: #e8e2d4; text-shadow: 0 -1px 0 #000; letter-spacing: 0.02em; }
 .chrome-btn:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), inset 0 0 0 2px rgba(255, 255, 255, 0.35); }
-.chrome-btn.small { width: 38px; height: 38px; justify-self: end; }
+.chrome-btn.small { width: 38px; height: 38px; }
 .chrome-btn.small::before { inset: 5px; }
 .chrome-btn.small::after { left: 8px; right: 8px; top: 6px; height: 11px; }
 .chrome-btn.small svg { width: 17px; height: 17px; }
-.chrome-btn.spin svg { animation: spin 0.5s cubic-bezier(.3, .7, .2, 1); }
 @keyframes spin { to { transform: rotate(-360deg); } }
 
-.plate-actions { position: relative; z-index: 1; justify-self: end; display: flex; gap: 10px; }
+.plate-actions { position: relative; z-index: 1; display: flex; gap: 8px; }
 
 .flash-btn[aria-pressed="true"]::before,
 .date-btn[aria-pressed="true"]::before {
@@ -218,7 +296,7 @@ button { font: inherit; color: inherit; }
   --ar: 1.5;
   position: relative;
   aspect-ratio: var(--ar);
-  width: min(calc(100vw - 70px), 460px, calc((100dvh - 410px) * var(--ar)));
+  width: min(calc(100vw - 70px), 460px, calc((100dvh - 470px) * var(--ar)));
   background: #000;
   border-radius: 10px;
   border: 6px solid #050505;
@@ -271,7 +349,7 @@ button { font: inherit; color: inherit; }
 .controls {
   width: min(100%, 500px);
   display: grid;
-  grid-template-columns: 1fr 1.35fr;
+  grid-template-columns: 0.78fr 1.6fr;
   gap: 10px;
 }
 /* цифрова камера: плівки немає, вибір камери на всю ширину */
@@ -290,9 +368,8 @@ button { font: inherit; color: inherit; }
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.28));
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.1);
 }
-.well > .pill-wrap, .film-pick, label.well { flex: 1; min-width: 0; }
-label.well { flex-direction: column; align-items: stretch; gap: 5px; }
-.film-pick { display: flex; flex-direction: column; gap: 5px; }
+.cam-well { flex-direction: column; align-items: stretch; gap: 6px; flex: 1; }
+.film-pick { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 
 .engrave {
   font-size: 10px;
@@ -303,42 +380,70 @@ label.well { flex-direction: column; align-items: stretch; gap: 5px; }
   text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-.pill-wrap { position: relative; display: block; }
-.pill-wrap::after { /* стрілочка */
+/* барабан вибору: колесо з трьох видимих пунктів, середній у смузі */
+:root { --drum-item: 28px; }
+.drum {
+  position: relative;
+  height: calc(var(--drum-item) * 3);
+  border-radius: 8px;
+  border: 1px solid #000;
+  overflow: hidden;
+  background: linear-gradient(90deg, #17181a 0%, #303236 14%, #484a4f 50%, #303236 86%, #17181a 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 1px 0 rgba(255, 255, 255, 0.12), 0 3px 6px rgba(0, 0, 0, 0.6);
+}
+.drum:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.drum-scroll {
+  height: 100%;
+  padding: var(--drum-item) 0;
+  box-sizing: border-box;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+.drum-scroll::-webkit-scrollbar { display: none; }
+.drum-item {
+  height: var(--drum-item);
+  line-height: var(--drum-item);
+  padding: 0 10px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #f3ead5;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  scroll-snap-align: center;
+  cursor: pointer;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+.drum::before, .drum::after {
   content: "";
   position: absolute;
-  right: 12px;
-  top: 50%;
-  width: 7px;
-  height: 7px;
-  margin-top: -6px;
-  border-right: 2px solid #eef2f8;
-  border-bottom: 2px solid #eef2f8;
-  transform: rotate(45deg);
-  filter: drop-shadow(0 -1px 0 rgba(0, 0, 0, 0.6));
+  left: 0;
+  right: 0;
+  height: var(--drum-item);
+  z-index: 2;
   pointer-events: none;
 }
-select.pill {
-  width: 100%;
-  height: 40px;
-  padding: 0 30px 0 12px;
-  appearance: none;
-  -webkit-appearance: none;
-  border-radius: 8px;
-  border: 1px solid #101820;
-  color: #fff;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.75);
-  cursor: pointer;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.1) 49%, rgba(0, 0, 0, 0.1) 50%, rgba(0, 0, 0, 0.22) 100%),
-    linear-gradient(180deg, #6f819b, #3d4c63);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 1px 0 rgba(255, 255, 255, 0.14), 0 2px 4px rgba(0, 0, 0, 0.7);
+.drum::before { top: 0; background: linear-gradient(180deg, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0)); }
+.drum::after { bottom: 0; background: linear-gradient(0deg, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0)); }
+.drum-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--drum-item);
+  height: var(--drum-item);
+  z-index: 1;
+  pointer-events: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.02) 50%, rgba(255, 176, 46, 0.1));
 }
-select.pill option, select.pill optgroup { color: #111; text-shadow: none; }
 
 /* касета: циліндр із кольоровою етикеткою */
 .canister {
@@ -405,8 +510,6 @@ select.pill option, select.pill optgroup { color: #111; text-shadow: none; }
 .bottom .thumb-btn { justify-self: start; }
 .bottom .format-btn { justify-self: end; }
 
-/* спалах — маленька кнопка в кутку видошукача, як у камері iOS */
-.finder .flash-btn { position: absolute; top: 8px; left: 8px; z-index: 3; }
 
 /* мініатюра останнього кадру: відкриває стрічку */
 .thumb-btn {
@@ -703,11 +806,11 @@ select.pill option, select.pill optgroup { color: #111; text-shadow: none; }
 
 @media (max-width: 380px) {
   .brand { letter-spacing: 0.18em; }
-  .controls { grid-template-columns: 1fr; }
-  .finder { width: min(calc(100vw - 70px), calc((100dvh - 500px) * var(--ar))); }
+  .finder { width: min(calc(100vw - 70px), calc((100dvh - 520px) * var(--ar))); }
+  .drum-item { font-size: 12px; padding: 0 6px; }
 }
 @media (max-height: 700px) {
-  .finder { width: min(calc(100vw - 70px), 460px, calc((100dvh - 370px) * var(--ar))); }
+  .finder { width: min(calc(100vw - 70px), 460px, calc((100dvh - 430px) * var(--ar))); }
   .plate #cam-info { display: none; }
   .shutter { width: 76px; height: 76px; }
   .shutter span { width: 54px; height: 54px; }

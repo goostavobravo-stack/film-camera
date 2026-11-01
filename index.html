@@ -19,20 +19,29 @@
       <span class="screw s1" aria-hidden="true"></span>
       <span class="screw s2" aria-hidden="true"></span>
 
-      <div class="counter" id="counter" role="img" aria-label="Лічильник кадрів">
-        <span class="wheel" id="wheel-tens">0</span><span class="wheel" id="wheel-ones">0</span>
-        <span class="counter-max">/36</span>
+      <div class="plate-row">
+        <div class="counter" id="counter" role="img" aria-label="Лічильник кадрів">
+          <span class="wheel" id="wheel-tens">0</span><span class="wheel" id="wheel-ones">0</span>
+          <span class="counter-max">/36</span>
+        </div>
+
+        <div class="plate-actions" role="group" aria-label="Спалах і дата">
+          <button class="chrome-btn small flash-btn" id="flash-btn" type="button" aria-pressed="false" aria-label="Спалах">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 5 13.5h5.5L9 22l9.5-12H13z"/></svg>
+          </button>
+          <button class="chrome-btn small date-btn" id="date-btn" type="button" aria-pressed="true" aria-label="Дата на кадрі">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm12 8v10H5V10h14z"/></svg>
+          </button>
+        </div>
+
+        <div class="brand" aria-hidden="true">ПЛІВКА <b>36</b></div>
       </div>
 
-      <div class="brand" aria-hidden="true">ПЛІВКА <b>36</b></div>
-
-      <div class="plate-actions">
-        <button class="chrome-btn small date-btn" id="date-btn" type="button" aria-pressed="true" aria-label="Дата на кадрі">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm12 8v10H5V10h14z"/></svg>
-        </button>
-        <button class="chrome-btn small rewind" id="rewind" type="button" aria-label="Перемотати плівку">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2L7 6.5 12 11V8a5 5 0 1 1-5 5H5a7 7 0 1 0 7-8z"/></svg>
-        </button>
+      <!-- важіль перемотки: протягніть ручку зліва направо -->
+      <div class="lever" id="rewind" role="slider" tabindex="0" aria-label="Перемотати плівку: протягніть вправо" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="lever-fill"></div>
+        <span class="lever-label">перемотати плівку</span>
+        <div class="lever-knob" aria-hidden="true"><i></i><i></i><i></i></div>
       </div>
     </header>
 
@@ -43,20 +52,15 @@
           <div class="finder-marks" aria-hidden="true"></div>
           <div class="flash" id="flash" aria-hidden="true"></div>
           <div class="glare" aria-hidden="true"></div>
-          <button class="chrome-btn small flash-btn" id="flash-btn" type="button" aria-pressed="false" aria-label="Спалах">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 5 13.5h5.5L9 22l9.5-12H13z"/></svg>
-          </button>
           <button class="finder-msg" id="finder-msg" type="button" hidden></button>
         </div>
       </div>
 
       <div class="controls" id="controls">
-        <label class="well">
+        <div class="well cam-well">
           <span class="engrave">Камера</span>
-          <span class="pill-wrap">
-            <select class="pill" id="camera-select"></select>
-          </span>
-        </label>
+          <div class="drum" id="camera-drum"></div>
+        </div>
 
         <div class="well film-well">
           <div class="canister" id="canister" aria-hidden="true">
@@ -64,12 +68,10 @@
             <div class="can-label"><b id="canister-brand"></b><span id="canister-name"></span></div>
             <i class="cap cap-bottom"></i>
           </div>
-          <label class="film-pick">
+          <div class="film-pick">
             <span class="engrave">Плівка</span>
-            <span class="pill-wrap">
-              <select class="pill" id="film-select"></select>
-            </span>
-          </label>
+            <div class="drum" id="film-drum"></div>
+          </div>
         </div>
       </div>
 

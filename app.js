@@ -1,7 +1,10 @@
 import { CAMERAS } from './cameras.js';
 import { FILMS, developFilm } from './films.js';
 import { FilmPipeline, MAX_OUTPUT_SIZE, computeParams, formatDateStamp, loadLut } from './pipeline.js';
-import { newSeed, rollFrame } from './random.js';
+import { NEUTRAL_FRAME, newSeed, rollFrame } from './random.js';
+import { createDrum } from './drum.js';
+import { createLever } from './lever.js';
+import { haptic } from './haptics.js';
 import { clearShots, deleteShot, loadShots, saveShot } from './store.js';
 
 const MAX_FRAMES = 36;
@@ -20,8 +23,8 @@ const els = {
   wheelOnes: $('wheel-ones'),
   shutter: $('shutter'),
   rewind: $('rewind'),
-  cameraSelect: $('camera-select'),
-  filmSelect: $('film-select'),
+  cameraDrum: $('camera-drum'),
+  filmDrum: $('film-drum'),
   canister: $('canister'),
   canisterBrand: $('canister-brand'),
   canisterName: $('canister-name'),
@@ -97,8 +100,8 @@ function writeStore() {
 
 const saved = readStore();
 const state = {
-  cameraId: CAMERAS.some((c) => c.id === saved.camera) ? saved.camera : CAMERAS[0].id,
-  filmId: FILMS.some((f) => f.id === saved.film) ? saved.film : FILMS[0].id,
+  cameraId: CAMERAS.some((c) => c.id === saved.camera) ? saved.camera : 'leica',
+  filmId: FILMS.some((f) => f.id === saved.film) ? saved.film : 'kodak-gold-200',
   aspect: saved.aspect === '1:1' ? '1:1' : '3:2',
   count: Number.isInteger(saved.count) ? Math.min(Math.max(saved.count, 0), MAX_FRAMES) : 0,
   flash: saved.flash === true,
@@ -114,6 +117,8 @@ const pipeline = new FilmPipeline(els.out);
 const offscreen = document.createElement('canvas');
 const currentCamera = () => CAMERAS.find((c) => c.id === state.cameraId);
 const currentFilm = () => FILMS.find((f) => f.id === state.filmId);
+/** Камера iPhone й плівка Null: жодних ефектів, випадковостей і колірних змін. */
+const isCleanMode = () => state.cameraId === 'iphone' && state.filmId === 'null';
 
 // --- UI -----------------------------------------------------------------------
 
@@ -140,32 +145,11 @@ function renderCounter() {
   els.shutter.setAttribute('aria-disabled', String(!digital && state.count >= MAX_FRAMES));
 }
 
-/** Плівки в списку групуються за брендами, камери йдуть списком. */
-function fillCameraSelect() {
-  els.cameraSelect.replaceChildren(
-    ...CAMERAS.map((c) => new Option(c.name, c.id, false, c.id === state.cameraId)),
-  );
-}
-function fillFilmSelect() {
-  const groups = new Map();
-  for (const f of FILMS) {
-    if (!groups.has(f.brand)) groups.set(f.brand, []);
-    groups.get(f.brand).push(f);
-  }
-  els.filmSelect.replaceChildren(
-    ...[...groups].map(([brand, films]) => {
-      const g = document.createElement('optgroup');
-      g.label = brand;
-      g.append(...films.map((f) => new Option(f.name, f.id, false, f.id === state.filmId)));
-      return g;
-    }),
-  );
-}
-
 function renderSelection() {
   const film = currentFilm();
   const cam = currentCamera();
   els.controls.classList.toggle('digital', !!cam.digital);
+  requestAnimationFrame(() => filmDrum.sync()); // після появи/зникнення барабана прокрутка збивається
   els.camInfo.textContent = `${cam.name} — ${cam.blurb}`;
   if (cam.digital) {
     els.filmInfo.textContent = `${cam.name}: цифровий сенсор, плівка не використовується`;
@@ -174,9 +158,11 @@ function renderSelection() {
   const [bg, fg] = film.label;
   els.canister.style.setProperty('--lbl-bg', bg);
   els.canister.style.setProperty('--lbl-fg', fg);
-  els.canisterBrand.textContent = film.brand === 'Особливі' ? '' : BRAND_SHORT[film.brand] || film.brand;
-  els.canisterName.textContent = film.iso === '?' || film.special === 'reel' ? film.name : `ISO ${film.iso}`;
-  els.filmInfo.textContent = `${film.name} · ISO ${film.iso} — ${film.blurb}`;
+  els.canisterBrand.textContent = ['Особливі', 'Без ефектів'].includes(film.brand) ? '' : BRAND_SHORT[film.brand] || film.brand;
+  els.canisterName.textContent = film.id === 'null' ? 'NULL' : film.iso === '?' || film.special === 'reel' ? film.name : `ISO ${film.iso}`;
+  els.filmInfo.textContent = isCleanMode()
+    ? 'Чистий режим: кадр без ефектів камери й плівки, як його віддав iPhone'
+    : `${film.name} · ISO ${film.iso} — ${film.blurb}`;
   els.camInfo.textContent = `${cam.name} — ${cam.blurb}`;
 }
 
@@ -200,15 +186,26 @@ function renderAspect() {
   updateFinder();
 }
 
-fillCameraSelect();
-fillFilmSelect();
-els.cameraSelect.addEventListener('change', () => {
-  state.cameraId = els.cameraSelect.value;
-  writeStore();
-  renderSelection();
-  renderCounter();
+// барабани вибору камери й плівки
+const cameraDrum = createDrum(els.cameraDrum, CAMERAS.map((c) => ({ id: c.id, label: c.name })), {
+  index: Math.max(0, CAMERAS.findIndex((c) => c.id === state.cameraId)),
+  label: 'Камера',
+  onChange: (item) => {
+    state.cameraId = item.id;
+    writeStore();
+    renderSelection();
+    renderCounter();
+  },
 });
-els.filmSelect.addEventListener('change', () => { state.filmId = els.filmSelect.value; writeStore(); renderSelection(); });
+const filmDrum = createDrum(els.filmDrum, FILMS.map((f) => ({ id: f.id, label: f.name })), {
+  index: Math.max(0, FILMS.findIndex((f) => f.id === state.filmId)),
+  label: 'Плівка',
+  onChange: (item) => {
+    state.filmId = item.id;
+    writeStore();
+    renderSelection();
+  },
+});
 
 els.formatBtn.addEventListener('click', () => {
   state.aspect = state.aspect === '3:2' ? '1:1' : '3:2';
@@ -232,22 +229,21 @@ els.flashBtn.addEventListener('click', () => {
   }
 });
 
-els.rewind.addEventListener('click', () => {
+/** Перемотка: кадри стрічки видаляються, лічильники скидаються. Викликається, коли важіль дотягнуто до кінця. */
+function rewindAll() {
   if (state.count === 0 && state.digitalCount === 0 && state.roll.length === 0) return toast('Плівка вже на початку');
-  const message = state.roll.length
-    ? `Перемотати плівку? Усі кадри в стрічці (${state.roll.length}) буде видалено назавжди. Якщо вони ще потрібні, спершу натисніть «Зберегти все».`
-    : 'Перемотати плівку? Лічильник скинеться на 0.';
-  if ((state.roll.length || state.count < MAX_FRAMES) && !confirm(message)) return;
   const removed = state.roll.length;
   state.count = 0;
   state.digitalCount = 0;
   writeStore();
   renderCounter();
   clearRoll();
-  els.rewind.classList.add('spin');
-  setTimeout(() => els.rewind.classList.remove('spin'), 500);
   toast(removed ? 'Плівку перемотано, стрічку очищено' : 'Плівку перемотано');
-});
+  // перемотка камеру не чіпає, але систему могло збити (діалог, перемикання застосунків): перевіряємо
+  if (!cameraAlive()) recoverCamera();
+}
+
+createLever(els.rewind, { onComplete: rewindAll });
 
 // --- камера -------------------------------------------------------------------
 
@@ -393,6 +389,50 @@ function stopCamera() {
   els.video.srcObject = null;
 }
 
+// --- стійкість камери --------------------------------------------------------------
+// Систему може зупинити відео (діалог, перемикання застосунків, перерваний потік): тоді drawImage дає
+// той самий застиглий кадр. Перед кожним знімком і після перемотки перевіряємо, що кадри справді йдуть.
+
+let lastFrameAt = 0;
+let frameWatch = false;
+
+function watchFrames() {
+  if (frameWatch || !els.video.requestVideoFrameCallback) return;
+  frameWatch = true;
+  const tick = () => {
+    lastFrameAt = performance.now();
+    els.video.requestVideoFrameCallback(tick);
+  };
+  els.video.requestVideoFrameCallback(tick);
+}
+
+/** Потік живий, відео грає, а нові кадри надходять (де це можна перевірити). */
+function cameraAlive() {
+  const track = videoTrack();
+  if (!track || track.readyState !== 'live' || els.video.paused || els.video.readyState < 2) return false;
+  if (demoMode || !els.video.requestVideoFrameCallback || !lastFrameAt) return true;
+  return performance.now() - lastFrameAt < 2500;
+}
+
+/** Будить відео, а якщо кадри не пішли, відкриває камеру заново. Повертає true, коли камера працює. */
+async function recoverCamera() {
+  try {
+    await els.video.play();
+  } catch { /* потік міг померти: пробуємо перезапуск нижче */ }
+  const t0 = els.video.currentTime;
+  await sleep(300);
+  if (cameraAlive() && (demoMode || els.video.currentTime !== t0)) return true;
+  await startCamera();
+  for (let i = 0; i < 25 && !els.video.videoWidth; i++) await sleep(150);
+  return !!els.video.videoWidth && cameraAlive();
+}
+
+// якщо систему поставила відео на паузу без нашого відома, одразу продовжуємо
+els.video.addEventListener('pause', () => {
+  if (!document.hidden && stream) els.video.play().catch(() => {});
+});
+els.video.addEventListener('playing', watchFrames);
+
 els.msg.addEventListener('click', startCamera);
 els.video.addEventListener('loadedmetadata', updateFinder);
 els.video.addEventListener('resize', updateFinder);
@@ -480,6 +520,14 @@ async function shoot() {
   let torchOn = false;
   let torchFired = false;
   try {
+    if (!cameraAlive()) {
+      toast('Камера оживає…', 1500);
+      if (!(await recoverCamera())) {
+        toast('Камера не відповідає: торкніться видошукача, щоб запустити її знову', 3200);
+        return;
+      }
+    }
+
     // справжній спалах: вмикаємо ліхтарик і чекаємо, поки камера підлаштує експозицію
     if (state.flash && state.torch) {
       torchOn = await setTorch(true);
@@ -488,7 +536,7 @@ async function shoot() {
     }
 
     clickSound();
-    if (navigator.vibrate) navigator.vibrate(12);
+    haptic('click');
     els.flash.classList.remove('go', 'strong');
     void els.flash.offsetWidth;
     els.flash.classList.add('go');
@@ -505,7 +553,10 @@ async function shoot() {
     torchOn = false;
 
     const seed = newSeed();
-    const frame = rollFrame(seed, { flash: state.flash, leakMul: camera.leakMul, digital: camera.digital });
+    // без плівки (Null) нічого випадкового не буває: ні протічок, ні пилу, ні зсуву експозиції
+    const frame = film.id === 'null'
+      ? { ...NEUTRAL_FRAME, seed, flash: state.flash ? 1 : 0, events: state.flash ? ['flash'] : [] }
+      : rollFrame(seed, { flash: state.flash, leakMul: camera.leakMul, digital: camera.digital });
     // якщо ліхтарик справді світив, імітації потрібно менше
     if (torchFired) frame.flash *= 0.5;
 
