@@ -2,7 +2,6 @@ import { CAMERAS } from './cameras.js';
 import { FILMS, developFilm } from './films.js';
 import { FilmPipeline, MAX_OUTPUT_SIZE, computeParams, formatDateStamp, loadLut } from './pipeline.js';
 import { newSeed, rollFrame } from './random.js';
-import { buildLensList } from './lenses.js';
 import { clearShots, deleteShot, loadShots, saveShot } from './store.js';
 
 const MAX_FRAMES = 36;
@@ -30,7 +29,6 @@ const els = {
   camInfo: $('cam-info'),
   flashBtn: $('flash-btn'),
   dateBtn: $('date-btn'),
-  lensPicker: $('lens-picker'),
   controls: $('controls'),
   galleryBtn: $('gallery-btn'),
   galleryThumb: $('gallery-thumb'),
@@ -87,7 +85,6 @@ function writeStore() {
       count: state.count,
       flash: state.flash,
       date: state.date,
-      lens: state.lensId,
       digitalCount: state.digitalCount,
     }));
   } catch { /* приватний режим: працюємо без збереження */ }
@@ -101,8 +98,6 @@ const state = {
   count: Number.isInteger(saved.count) ? Math.min(Math.max(saved.count, 0), MAX_FRAMES) : 0,
   flash: saved.flash === true,
   date: saved.date !== false, // штамп дати за замовчуванням увімкнений
-  lensId: typeof saved.lens === 'string' ? saved.lens : null, // обраний модуль камери (deviceId)
-  lenses: [], // доступні модулі, відомі після дозволу на камеру
   roll: [], // кадри поточної плівки (дублюються в IndexedDB): { id, n, name, blob, thumb, caption, digital, time }
   digitalCount: Number.isInteger(saved.digitalCount) ? saved.digitalCount : 0, // лічильник кадрів цифрової камери
   torch: false, // чи вміє поточна камера вмикати ліхтарик (iOS Safari не вміє)
@@ -279,7 +274,7 @@ function describeError(err) {
 }
 
 /** Тестова картинка для ?demo: дає змогу перевірити пайплайн без камери. */
-function createDemoStream(zoom = 1) {
+function createDemoStream() {
   const cv = document.createElement('canvas');
   cv.width = 1280;
   cv.height = 720;
@@ -287,12 +282,6 @@ function createDemoStream(zoom = 1) {
   const draw = (t) => {
     const w = cv.width;
     const h = cv.height;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, w, h);
-    ctx.translate(w / 2, h / 2); // демо-«об'єктиви» відрізняються масштабом
-    ctx.scale(zoom, zoom);
-    ctx.translate(-w / 2, -h / 2);
     const sky = ctx.createLinearGradient(0, 0, 0, h * 0.65);
     sky.addColorStop(0, '#3b6fb5');
     sky.addColorStop(1, '#f3c98b');
@@ -358,70 +347,15 @@ async function setTorch(on) {
   }
 }
 
-const DEMO_LENSES = [
-  { deviceId: 'demo-uw', label: 'Back Ultra Wide Camera', zoom: 0.6 },
-  { deviceId: 'demo-w', label: 'Back Camera', zoom: 1 },
-  { deviceId: 'demo-t', label: 'Back Telephoto Camera', zoom: 2 },
-];
-
-async function openStream(lensId) {
-  if (demoMode) return createDemoStream((DEMO_LENSES.find((l) => l.deviceId === lensId) || DEMO_LENSES[1]).zoom);
+function openStream() {
+  if (demoMode) return Promise.resolve(createDemoStream());
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    throw Object.assign(new Error('mediaDevices'), { name: 'NotSupportedError' });
+    return Promise.reject(Object.assign(new Error('mediaDevices'), { name: 'NotSupportedError' }));
   }
-  const size = { width: { ideal: 1920 }, height: { ideal: 1080 } };
   return navigator.mediaDevices.getUserMedia({
-    video: lensId ? { deviceId: { exact: lensId }, ...size } : { facingMode: { ideal: 'environment' }, ...size },
+    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
     audio: false,
   });
-}
-
-// --- модулі камери ------------------------------------------------------------
-
-function activeLensId() {
-  if (demoMode) return state.lensId || 'demo-w';
-  const track = videoTrack();
-  return (track && track.getSettings && track.getSettings().deviceId) || state.lensId;
-}
-
-function renderLenses() {
-  const active = activeLensId();
-  els.lensPicker.hidden = state.lenses.length < 2;
-  els.lensPicker.replaceChildren(
-    ...state.lenses.map((lens) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'lens-btn';
-      b.textContent = lens.short;
-      b.title = lens.name;
-      b.setAttribute('aria-label', `Модуль камери: ${lens.name}`);
-      b.setAttribute('aria-pressed', String(lens.id === active));
-      b.addEventListener('click', () => pickLens(lens));
-      return b;
-    }),
-  );
-}
-
-/** Підписи пристроїв з'являються лише після дозволу, тому список оновлюємо після старту потоку. */
-async function refreshLenses() {
-  let devices = [];
-  if (demoMode) {
-    devices = DEMO_LENSES.map((d) => ({ kind: 'videoinput', deviceId: d.deviceId, label: d.label }));
-  } else if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
-    try {
-      devices = await navigator.mediaDevices.enumerateDevices();
-    } catch { /* без вибору модуля */ }
-  }
-  state.lenses = buildLensList(devices);
-  renderLenses();
-}
-
-function pickLens(lens) {
-  if (lens.id === activeLensId()) return;
-  state.lensId = lens.id;
-  writeStore();
-  toast(`Модуль камери: ${lens.name}`);
-  startCamera();
 }
 
 async function startCamera() {
@@ -429,16 +363,7 @@ async function startCamera() {
   stopCamera();
   showMsg('Запуск камери…', false);
   try {
-    let s;
-    try {
-      s = await openStream(state.lensId);
-    } catch (err) {
-      // збережений модуль зник: повертаємось до задньої камери за замовчуванням
-      if (!state.lensId || !['OverconstrainedError', 'NotFoundError'].includes(err && err.name)) throw err;
-      state.lensId = null;
-      writeStore();
-      s = await openStream(null);
-    }
+    const s = await openStream();
     if (token !== startToken) {
       s.getTracks().forEach((t) => t.stop());
       return;
@@ -450,7 +375,6 @@ async function startCamera() {
     if (token !== startToken) return;
     hideMsg();
     updateFinder();
-    await refreshLenses();
   } catch (err) {
     if (token !== startToken) return;
     console.warn('Камера:', err);

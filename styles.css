@@ -278,45 +278,6 @@ button { font: inherit; color: inherit; }
 .controls.digital { grid-template-columns: 1fr; }
 .controls.digital .film-well { display: none; }
 
-/* вибір модуля камери: круглі глянцеві кнопки поверх видошукача, як у камері iOS */
-.lens-picker {
-  position: absolute;
-  left: 50%;
-  bottom: 10px;
-  z-index: 3;
-  display: flex;
-  gap: 8px;
-  padding: 4px 6px;
-  border-radius: 20px;
-  background: rgba(0, 0, 0, 0.45);
-  transform: translateX(-50%);
-}
-.lens-picker[hidden] { display: none; }
-.lens-btn {
-  min-width: 34px;
-  height: 34px;
-  padding: 0 8px;
-  border-radius: 17px;
-  border: 1px solid rgba(0, 0, 0, 0.8);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 800;
-  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.8);
-  cursor: pointer;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.08) 49%, rgba(0, 0, 0, 0.1) 50%, rgba(0, 0, 0, 0.25) 100%),
-    linear-gradient(180deg, #5b5b5d, #2b2b2d);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 1px 3px rgba(0, 0, 0, 0.7);
-}
-.lens-btn[aria-pressed="true"] {
-  color: #3a2300;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.12) 49%, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.1) 100%),
-    linear-gradient(180deg, #ffd479, #ff9d1a);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 0 10px rgba(255, 176, 46, 0.6);
-}
-
 .counter.off .wheel { color: #5b574d; }
 
 .well {
