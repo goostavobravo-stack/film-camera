@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#121110">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Плівка">
+  <title>Плівкова камера</title>
+  <link rel="icon" href="icon-180.png">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="camera">
+    <header class="top-plate">
+      <div class="counter" id="counter" role="img" aria-label="Лічильник кадрів">
+        <span class="counter-value" id="counter-value">00</span>
+        <span class="counter-max">/36</span>
+      </div>
+      <div class="brand" aria-hidden="true">ПЛІВКА <b>36</b></div>
+      <button class="rewind" id="rewind" type="button" aria-label="Перемотати плівку">
+        <span class="rewind-knob" aria-hidden="true"></span>
+        <span class="rewind-label">перемотати</span>
+      </button>
+    </header>
+
+    <section class="body">
+      <div class="finder" id="finder">
+        <video id="video" playsinline muted autoplay></video>
+        <div class="finder-marks" aria-hidden="true"></div>
+        <div class="flash" id="flash" aria-hidden="true"></div>
+        <button class="finder-msg" id="finder-msg" type="button" hidden></button>
+      </div>
+
+      <div class="dials">
+        <label class="dial">
+          <span class="dial-label">Камера</span>
+          <select id="camera-select"></select>
+        </label>
+        <label class="dial">
+          <span class="dial-label">Плівка</span>
+          <select id="film-select"></select>
+        </label>
+        <div class="dial" role="group" aria-label="Формат кадру">
+          <span class="dial-label">Кадр</span>
+          <div class="seg">
+            <button type="button" data-aspect="3:2" aria-pressed="true">3:2</button>
+            <button type="button" data-aspect="1:1" aria-pressed="false">1:1</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="bottom">
+      <button class="shutter" id="shutter" type="button" aria-label="Спуск"><span></span></button>
+    </footer>
+  </main>
+
+  <section class="print" id="print" hidden aria-label="Готовий кадр">
+    <canvas id="out"></canvas>
+    <p class="print-caption" id="print-caption"></p>
+    <div class="print-actions">
+      <button type="button" id="save" class="btn primary">Зберегти</button>
+      <button type="button" id="close" class="btn">Далі</button>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
