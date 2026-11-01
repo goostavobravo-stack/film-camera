@@ -174,11 +174,15 @@ button { font: inherit; color: inherit; }
 .chrome-btn.spin svg { animation: spin 0.5s cubic-bezier(.3, .7, .2, 1); }
 @keyframes spin { to { transform: rotate(-360deg); } }
 
-.flash-btn[aria-pressed="true"]::before {
+.plate-actions { position: relative; z-index: 1; justify-self: end; display: flex; gap: 10px; }
+
+.flash-btn[aria-pressed="true"]::before,
+.date-btn[aria-pressed="true"]::before {
   background: radial-gradient(circle at 50% 40%, #ffe29a, #ffb02e 55%, #b26a00);
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.7), inset 0 -2px 4px rgba(120, 60, 0, 0.7), 0 0 14px 3px rgba(255, 176, 46, 0.6);
 }
-.flash-btn[aria-pressed="true"] svg { fill: #fff7dc; filter: drop-shadow(0 0 4px #fff) drop-shadow(0 -1px 0 #b26a00); }
+.flash-btn[aria-pressed="true"] svg,
+.date-btn[aria-pressed="true"] svg { fill: #fff7dc; filter: drop-shadow(0 0 4px #fff) drop-shadow(0 -1px 0 #b26a00); }
 
 /* --- видошукач: хромова рамка і скло --- */
 .body {

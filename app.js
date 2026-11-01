@@ -1,6 +1,6 @@
 import { CAMERAS } from './cameras.js';
 import { FILMS, developFilm } from './films.js';
-import { FilmPipeline, MAX_OUTPUT_SIZE, computeParams, loadLut } from './pipeline.js';
+import { FilmPipeline, MAX_OUTPUT_SIZE, computeParams, formatDateStamp, loadLut } from './pipeline.js';
 import { newSeed, rollFrame } from './random.js';
 
 const MAX_FRAMES = 36;
@@ -27,6 +27,7 @@ const els = {
   filmInfo: $('film-info'),
   camInfo: $('cam-info'),
   flashBtn: $('flash-btn'),
+  dateBtn: $('date-btn'),
   formatBtn: $('format-btn'),
   formatLabel: $('format-label'),
   print: $('print'),
@@ -66,6 +67,7 @@ function writeStore() {
       aspect: state.aspect,
       count: state.count,
       flash: state.flash,
+      date: state.date,
     }));
   } catch { /* приватний режим: працюємо без збереження */ }
 }
@@ -77,6 +79,7 @@ const state = {
   aspect: saved.aspect === '1:1' ? '1:1' : '3:2',
   count: Number.isInteger(saved.count) ? Math.min(Math.max(saved.count, 0), MAX_FRAMES) : 0,
   flash: saved.flash === true,
+  date: saved.date !== false, // штамп дати за замовчуванням увімкнений
   torch: false, // чи вміє поточна камера вмикати ліхтарик (iOS Safari не вміє)
   busy: false,
   last: null, // { blob, name }
@@ -143,6 +146,17 @@ function renderSelection() {
 function renderFlash() {
   els.flashBtn.setAttribute('aria-pressed', String(state.flash));
 }
+
+function renderDate() {
+  els.dateBtn.setAttribute('aria-pressed', String(state.date));
+}
+
+els.dateBtn.addEventListener('click', () => {
+  state.date = !state.date;
+  writeStore();
+  renderDate();
+  toast(state.date ? 'Дата на кадрі: увімкнено' : 'Дата на кадрі: вимкнено');
+});
 
 function renderAspect() {
   els.formatLabel.textContent = state.aspect;
@@ -449,7 +463,11 @@ async function shoot() {
 
     const dev = developFilm(film, seed);
     const lut = await loadLut(dev.film.lut);
-    const params = computeParams(camera, dev.film, frame, lut, dev.overlay);
+    // що малюється поверх кадру: перфорація й ремджет від плівки, дата від камери
+    const overlay = state.date || dev.overlay
+      ? { ...dev.overlay, ...(state.date ? { dateStamp: formatDateStamp(new Date()) } : null) }
+      : null;
+    const params = computeParams(camera, dev.film, frame, lut, overlay);
     pipeline.render(offscreen, params);
     const blob = await pipeline.toBlob('image/jpeg', 0.92);
 
@@ -514,6 +532,7 @@ els.close.addEventListener('click', () => { els.print.hidden = true; });
 renderCounter();
 renderSelection();
 renderFlash();
+renderDate();
 renderAspect();
 if (!pipeline.supported) {
   showMsg('Цей браузер не підтримує WebGL, тож проявити кадр неможливо.', false);

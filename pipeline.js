@@ -251,6 +251,21 @@ export function referenceColor(rgb, p) {
 // Шейдери
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Штамп дати (семисегментний, як у плівкових мильницях)
+// ---------------------------------------------------------------------------
+
+/** Сегменти цифр: a верх, b верх-право, c низ-право, d низ, e низ-ліво, f верх-ліво, g середина. */
+export const SEGMENTS = {
+  0: 'abcdef', 1: 'bc', 2: 'abdeg', 3: 'abcdg', 4: 'bcfg', 5: 'acdfg', 6: 'acdefg', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg',
+};
+
+/** Дата у форматі плівкових камер: «'26 11 01» (рік, місяць, день). */
+export function formatDateStamp(date) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `'${p(date.getFullYear() % 100)} ${p(date.getMonth() + 1)} ${p(date.getDate())}`;
+}
+
 const VERT = `
 attribute vec2 aPos;
 varying vec2 vUv;
@@ -703,7 +718,62 @@ export class FilmPipeline {
     ctx.fillText(sp.text, t * 0.4 + sp.offset * w * 0.3, h - t * 0.18);
   }
 
-  /** Малює в окрему текстуру все, що лежить поверх кадру: пил, ремджет, перфорацію. */
+  /** Помаранчеві цифри внизу праворуч із червонуватим сяйвом; над смугою перфорації, якщо вона є. */
+  _paintDateStamp(ctx, text, w, h, bottomBar) {
+    const short = Math.min(w, h);
+    const H = 0.034 * short; // висота цифри
+    const dw = H * 0.56;
+    const gap = H * 0.28;
+    const th = Math.max(1.5, H * 0.14);
+    const widthOf = (ch) => (ch === ' ' ? dw * 0.7 : ch === "'" ? dw * 0.45 : dw);
+    const total = [...text].reduce((s, ch) => s + widthOf(ch) + gap, -gap);
+    const x0 = w - 0.045 * short - total;
+    const y0 = h - (bottomBar + 0.045) * short - H;
+
+    const SEG = {
+      a: [0, 0, 1, 0], b: [1, 0, 1, 0.5], c: [1, 0.5, 1, 1], d: [0, 1, 1, 1],
+      e: [0, 0.5, 0, 1], f: [0, 0, 0, 0.5], g: [0, 0.5, 1, 0.5],
+    };
+    const inset = th * 0.65; // зазор між сегментами
+    const strokeAll = () => {
+      let x = 0;
+      for (const ch of text) {
+        if (SEGMENTS[ch]) {
+          for (const s of SEGMENTS[ch]) {
+            const [ax, ay, bx, by] = SEG[s];
+            const horiz = ay === by;
+            ctx.beginPath();
+            ctx.moveTo(x + ax * dw + (horiz ? inset : 0), ay * H + (horiz ? 0 : inset * (ay === 0 ? 1 : 0.4)));
+            ctx.lineTo(x + bx * dw - (horiz ? inset : 0), by * H - (horiz ? 0 : inset * (by === 1 ? 1 : 0.4)));
+            ctx.stroke();
+          }
+        } else if (ch === "'") {
+          ctx.beginPath();
+          ctx.moveTo(x + dw * 0.4, 0);
+          ctx.lineTo(x + dw * 0.1, H * 0.24);
+          ctx.stroke();
+        }
+        x += widthOf(ch) + gap;
+      }
+    };
+
+    ctx.save();
+    ctx.translate(x0, y0);
+    ctx.transform(1, 0, -0.12, 1, 0, 0); // нахил, як у справжніх штампах
+    ctx.lineCap = 'round';
+    ctx.shadowColor = 'rgba(255,90,10,0.95)';
+    ctx.shadowBlur = th * 2.6;
+    ctx.strokeStyle = 'rgba(255,118,24,0.95)';
+    ctx.lineWidth = th;
+    strokeAll();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255,196,110,0.95)'; // гарячіша серцевина
+    ctx.lineWidth = th * 0.42;
+    strokeAll();
+    ctx.restore();
+  }
+
+  /** Малює в окрему текстуру все, що лежить поверх кадру: пил, ремджет, перфорацію, дату. */
   _drawOverlay(dust, overlay, w, h) {
     if (!this.dustCanvas) this.dustCanvas = document.createElement('canvas');
     const cv = this.dustCanvas;
@@ -714,6 +784,9 @@ export class FilmPipeline {
     if (overlay && overlay.remjet) this._paintRemjet(ctx, overlay.remjet, w);
     if (dust) this._paintDust(ctx, dust, w, h);
     if (overlay && overlay.sprockets) this._paintSprockets(ctx, overlay.sprockets, w, h);
+    if (overlay && overlay.dateStamp) {
+      this._paintDateStamp(ctx, overlay.dateStamp, w, h, overlay.sprockets ? overlay.sprockets.bar : 0);
+    }
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, this.dustTex);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -778,7 +851,7 @@ export class FilmPipeline {
     // 3. фінал
     this._upload(this.curveTex, 256, 1, p.curveLUT);
     this._setLut(p.lut);
-    const hasOverlay = !!(p.dust || (p.overlay && (p.overlay.remjet || p.overlay.sprockets)));
+    const hasOverlay = !!(p.dust || (p.overlay && (p.overlay.remjet || p.overlay.sprockets || p.overlay.dateStamp)));
     if (hasOverlay) this._drawOverlay(p.dust, p.overlay, w, h);
 
     const f = this.progs.final;

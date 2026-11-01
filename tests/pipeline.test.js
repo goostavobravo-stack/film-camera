@@ -6,7 +6,26 @@ import assert from 'node:assert/strict';
 import { CAMERAS, CAMERA_LIMITS, NEUTRAL_CAMERA } from '../cameras.js';
 import { FILMS, FILM_LIMITS, NEUTRAL_FILM, TINT_LIMIT, developFilm } from '../films.js';
 import { NEUTRAL_FRAME, rollFrame } from '../random.js';
-import { buildCurveLUT, computeParams, makeCurve, parseCube, referenceColor } from '../pipeline.js';
+import {
+  SEGMENTS, buildCurveLUT, computeParams, formatDateStamp, makeCurve, parseCube, referenceColor,
+} from '../pipeline.js';
+
+test('штамп дати: формат «\'РР ММ ДД» з нулями', () => {
+  assert.equal(formatDateStamp(new Date(2026, 10, 1)), "'26 11 01");
+  assert.equal(formatDateStamp(new Date(1999, 0, 9)), "'99 01 09");
+  assert.equal(formatDateStamp(new Date(2005, 11, 31)), "'05 12 31");
+});
+
+test('семисегментні цифри: правильна кількість сегментів', () => {
+  const counts = { 0: 6, 1: 2, 2: 5, 3: 5, 4: 4, 5: 5, 6: 6, 7: 3, 8: 7, 9: 6 };
+  for (const [d, n] of Object.entries(counts)) assert.equal(SEGMENTS[d].length, n, `цифра ${d}`);
+  assert.deepEqual(Object.keys(SEGMENTS).sort(), Object.keys(counts).sort());
+});
+
+test('dateStamp в overlay передається в параметри без змін', () => {
+  const overlay = { dateStamp: "'26 11 01" };
+  assert.equal(computeParams(NEUTRAL_CAMERA, NEUTRAL_FILM, NEUTRAL_FRAME, null, overlay).overlay, overlay);
+});
 
 const within = (v, [lo, hi]) => v >= lo && v <= hi;
 
