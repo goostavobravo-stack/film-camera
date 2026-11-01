@@ -122,8 +122,33 @@ test('профілі камер у межах CAMERA_LIMITS', () => {
   for (const [k, v] of Object.entries(expected)) assert.equal(leica[k], v, k);
 });
 
+test('Leica Q3: цифрова камера з власним look замість плівки', () => {
+  const q3 = CAMERAS.find((c) => c.id === 'leica-q3');
+  assert.ok(q3 && q3.digital === true);
+  assert.equal(CAMERAS.filter((c) => c.digital).length, 1, 'цифрова лише Q3');
+  const look = q3.look;
+  assert.ok(look && look.name === 'Leica Look');
+  // на відміну від плівки: чорний не піднятий, шум замість зерна, без гало, вуалі й міксу каналів
+  const curve = makeCurve(look.tonecurve);
+  assert.equal(curve(0), 0);
+  assert.equal(curve(1), 1);
+  assert.ok(look.grainAmount <= 0.08 && look.halation === 0 && look.fog === 0);
+  assert.ok(q3.sharpness >= 0.5, 'різка лінза');
+  assert.ok(q3.chromaticAberration <= 0.0005 && q3.barrelDistortion === 0, 'аберації й дисторсія виправлені');
+  for (const [key, range] of Object.entries(FILM_LIMITS)) assert.ok(within(look[key], range), key);
+  look.shadowTint.concat(look.highlightTint).forEach((v) => assert.ok(Math.abs(v) <= TINT_LIMIT));
+  // пайплайн приймає цифровий look як профіль плівки
+  const p = computeParams(q3, look, rollFrame(5, { digital: true }));
+  assert.ok(p.grainAmount <= 0.08 && p.glowAmount <= 0.1);
+  assert.equal(p.leak, null);
+  // тіні глибші, ніж у плівки з піднятим чорним
+  const q = referenceColor([40, 40, 40], computeParams(NEUTRAL_CAMERA, look, NEUTRAL_FRAME));
+  const gold = referenceColor([40, 40, 40], computeParams(NEUTRAL_CAMERA, FILMS[0], NEUTRAL_FRAME));
+  assert.ok(q[0] < gold[0], `Q3 ${q[0]} глибше за плівку ${gold[0]}`);
+});
+
 test('камер не менше дев\'яти, id унікальні, leakMul розумний', () => {
-  assert.ok(CAMERAS.length >= 9);
+  assert.ok(CAMERAS.length >= 10);
   assert.equal(new Set(CAMERAS.map((c) => c.id)).size, CAMERAS.length);
   for (const c of CAMERAS) {
     assert.ok(c.name && c.blurb);

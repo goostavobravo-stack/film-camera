@@ -2,6 +2,8 @@ import { CAMERAS } from './cameras.js';
 import { FILMS, developFilm } from './films.js';
 import { FilmPipeline, MAX_OUTPUT_SIZE, computeParams, formatDateStamp, loadLut } from './pipeline.js';
 import { newSeed, rollFrame } from './random.js';
+import { buildLensList } from './lenses.js';
+import { clearShots, deleteShot, loadShots, saveShot } from './store.js';
 
 const MAX_FRAMES = 36;
 const STORE_KEY = 'film-camera-v1';
@@ -28,6 +30,23 @@ const els = {
   camInfo: $('cam-info'),
   flashBtn: $('flash-btn'),
   dateBtn: $('date-btn'),
+  lensPicker: $('lens-picker'),
+  controls: $('controls'),
+  galleryBtn: $('gallery-btn'),
+  galleryThumb: $('gallery-thumb'),
+  galleryBadge: $('gallery-badge'),
+  gallery: $('gallery'),
+  galleryTitle: $('gallery-title'),
+  galleryGrid: $('gallery-grid'),
+  galleryEmpty: $('gallery-empty'),
+  galleryClose: $('gallery-close'),
+  gallerySaveAll: $('gallery-save-all'),
+  viewer: $('viewer'),
+  viewerImg: $('viewer-img'),
+  viewerCaption: $('viewer-caption'),
+  viewerBack: $('viewer-back'),
+  viewerDelete: $('viewer-delete'),
+  viewerSave: $('viewer-save'),
   formatBtn: $('format-btn'),
   formatLabel: $('format-label'),
   print: $('print'),
@@ -68,6 +87,8 @@ function writeStore() {
       count: state.count,
       flash: state.flash,
       date: state.date,
+      lens: state.lensId,
+      digitalCount: state.digitalCount,
     }));
   } catch { /* приватний режим: працюємо без збереження */ }
 }
@@ -80,6 +101,10 @@ const state = {
   count: Number.isInteger(saved.count) ? Math.min(Math.max(saved.count, 0), MAX_FRAMES) : 0,
   flash: saved.flash === true,
   date: saved.date !== false, // штамп дати за замовчуванням увімкнений
+  lensId: typeof saved.lens === 'string' ? saved.lens : null, // обраний модуль камери (deviceId)
+  lenses: [], // доступні модулі, відомі після дозволу на камеру
+  roll: [], // кадри поточної плівки (дублюються в IndexedDB): { id, n, name, blob, thumb, caption, digital, time }
+  digitalCount: Number.isInteger(saved.digitalCount) ? saved.digitalCount : 0, // лічильник кадрів цифрової камери
   torch: false, // чи вміє поточна камера вмикати ліхтарик (iOS Safari не вміє)
   busy: false,
   last: null, // { blob, name }
@@ -101,12 +126,18 @@ function toast(text, ms = 2400) {
 }
 
 function renderCounter() {
-  const s = String(state.count).padStart(2, '0');
+  const digital = currentCamera().digital;
+  // на цифровій камері плівки немає: лічильник погашений, спуск не блокується
+  const s = digital ? '--' : String(state.count).padStart(2, '0');
   els.wheelTens.textContent = s[0];
   els.wheelOnes.textContent = s[1];
-  els.counter.classList.toggle('end', state.count >= MAX_FRAMES);
-  els.counter.setAttribute('aria-label', `Знято кадрів: ${state.count} з ${MAX_FRAMES}`);
-  els.shutter.setAttribute('aria-disabled', String(state.count >= MAX_FRAMES));
+  els.counter.classList.toggle('off', !!digital);
+  els.counter.classList.toggle('end', !digital && state.count >= MAX_FRAMES);
+  els.counter.setAttribute(
+    'aria-label',
+    digital ? 'Цифрова камера: плівка не використовується' : `Знято кадрів: ${state.count} з ${MAX_FRAMES}`,
+  );
+  els.shutter.setAttribute('aria-disabled', String(!digital && state.count >= MAX_FRAMES));
 }
 
 /** Плівки в списку групуються за брендами, камери йдуть списком. */
@@ -134,6 +165,12 @@ function fillFilmSelect() {
 function renderSelection() {
   const film = currentFilm();
   const cam = currentCamera();
+  els.controls.classList.toggle('digital', !!cam.digital);
+  els.camInfo.textContent = `${cam.name} — ${cam.blurb}`;
+  if (cam.digital) {
+    els.filmInfo.textContent = `${cam.name}: цифровий сенсор, плівка не використовується`;
+    return;
+  }
   const [bg, fg] = film.label;
   els.canister.style.setProperty('--lbl-bg', bg);
   els.canister.style.setProperty('--lbl-fg', fg);
@@ -165,7 +202,12 @@ function renderAspect() {
 
 fillCameraSelect();
 fillFilmSelect();
-els.cameraSelect.addEventListener('change', () => { state.cameraId = els.cameraSelect.value; writeStore(); renderSelection(); });
+els.cameraSelect.addEventListener('change', () => {
+  state.cameraId = els.cameraSelect.value;
+  writeStore();
+  renderSelection();
+  renderCounter();
+});
 els.filmSelect.addEventListener('change', () => { state.filmId = els.filmSelect.value; writeStore(); renderSelection(); });
 
 els.formatBtn.addEventListener('click', () => {
@@ -191,14 +233,20 @@ els.flashBtn.addEventListener('click', () => {
 });
 
 els.rewind.addEventListener('click', () => {
-  if (state.count === 0) return toast('Плівка вже на початку');
-  if (state.count < MAX_FRAMES && !confirm('Перемотати плівку? Лічильник скинеться на 0.')) return;
+  if (state.count === 0 && state.digitalCount === 0 && state.roll.length === 0) return toast('Плівка вже на початку');
+  const message = state.roll.length
+    ? `Перемотати плівку? Усі кадри в стрічці (${state.roll.length}) буде видалено назавжди. Якщо вони ще потрібні, спершу натисніть «Зберегти все».`
+    : 'Перемотати плівку? Лічильник скинеться на 0.';
+  if ((state.roll.length || state.count < MAX_FRAMES) && !confirm(message)) return;
+  const removed = state.roll.length;
   state.count = 0;
+  state.digitalCount = 0;
   writeStore();
   renderCounter();
+  clearRoll();
   els.rewind.classList.add('spin');
   setTimeout(() => els.rewind.classList.remove('spin'), 500);
-  toast('Плівку перемотано');
+  toast(removed ? 'Плівку перемотано, стрічку очищено' : 'Плівку перемотано');
 });
 
 // --- камера -------------------------------------------------------------------
@@ -231,7 +279,7 @@ function describeError(err) {
 }
 
 /** Тестова картинка для ?demo: дає змогу перевірити пайплайн без камери. */
-function createDemoStream() {
+function createDemoStream(zoom = 1) {
   const cv = document.createElement('canvas');
   cv.width = 1280;
   cv.height = 720;
@@ -239,6 +287,12 @@ function createDemoStream() {
   const draw = (t) => {
     const w = cv.width;
     const h = cv.height;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+    ctx.translate(w / 2, h / 2); // демо-«об'єктиви» відрізняються масштабом
+    ctx.scale(zoom, zoom);
+    ctx.translate(-w / 2, -h / 2);
     const sky = ctx.createLinearGradient(0, 0, 0, h * 0.65);
     sky.addColorStop(0, '#3b6fb5');
     sky.addColorStop(1, '#f3c98b');
@@ -304,22 +358,86 @@ async function setTorch(on) {
   }
 }
 
+const DEMO_LENSES = [
+  { deviceId: 'demo-uw', label: 'Back Ultra Wide Camera', zoom: 0.6 },
+  { deviceId: 'demo-w', label: 'Back Camera', zoom: 1 },
+  { deviceId: 'demo-t', label: 'Back Telephoto Camera', zoom: 2 },
+];
+
+async function openStream(lensId) {
+  if (demoMode) return createDemoStream((DEMO_LENSES.find((l) => l.deviceId === lensId) || DEMO_LENSES[1]).zoom);
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw Object.assign(new Error('mediaDevices'), { name: 'NotSupportedError' });
+  }
+  const size = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+  return navigator.mediaDevices.getUserMedia({
+    video: lensId ? { deviceId: { exact: lensId }, ...size } : { facingMode: { ideal: 'environment' }, ...size },
+    audio: false,
+  });
+}
+
+// --- модулі камери ------------------------------------------------------------
+
+function activeLensId() {
+  if (demoMode) return state.lensId || 'demo-w';
+  const track = videoTrack();
+  return (track && track.getSettings && track.getSettings().deviceId) || state.lensId;
+}
+
+function renderLenses() {
+  const active = activeLensId();
+  els.lensPicker.hidden = state.lenses.length < 2;
+  els.lensPicker.replaceChildren(
+    ...state.lenses.map((lens) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lens-btn';
+      b.textContent = lens.short;
+      b.title = lens.name;
+      b.setAttribute('aria-label', `Модуль камери: ${lens.name}`);
+      b.setAttribute('aria-pressed', String(lens.id === active));
+      b.addEventListener('click', () => pickLens(lens));
+      return b;
+    }),
+  );
+}
+
+/** Підписи пристроїв з'являються лише після дозволу, тому список оновлюємо після старту потоку. */
+async function refreshLenses() {
+  let devices = [];
+  if (demoMode) {
+    devices = DEMO_LENSES.map((d) => ({ kind: 'videoinput', deviceId: d.deviceId, label: d.label }));
+  } else if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+    try {
+      devices = await navigator.mediaDevices.enumerateDevices();
+    } catch { /* без вибору модуля */ }
+  }
+  state.lenses = buildLensList(devices);
+  renderLenses();
+}
+
+function pickLens(lens) {
+  if (lens.id === activeLensId()) return;
+  state.lensId = lens.id;
+  writeStore();
+  toast(`Модуль камери: ${lens.name}`);
+  startCamera();
+}
+
 async function startCamera() {
   const token = ++startToken; // новіший запуск скасовує попередній
   stopCamera();
   showMsg('Запуск камери…', false);
   try {
     let s;
-    if (demoMode) {
-      s = createDemoStream();
-    } else {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw Object.assign(new Error('mediaDevices'), { name: 'NotSupportedError' });
-      }
-      s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: false,
-      });
+    try {
+      s = await openStream(state.lensId);
+    } catch (err) {
+      // збережений модуль зник: повертаємось до задньої камери за замовчуванням
+      if (!state.lensId || !['OverconstrainedError', 'NotFoundError'].includes(err && err.name)) throw err;
+      state.lensId = null;
+      writeStore();
+      s = await openStream(null);
     }
     if (token !== startToken) {
       s.getTracks().forEach((t) => t.stop());
@@ -332,6 +450,7 @@ async function startCamera() {
     if (token !== startToken) return;
     hideMsg();
     updateFinder();
+    await refreshLenses();
   } catch (err) {
     if (token !== startToken) return;
     console.warn('Камера:', err);
@@ -424,7 +543,7 @@ function stamp(d) {
 
 async function shoot() {
   if (state.busy) return;
-  if (state.count >= MAX_FRAMES) return toast('Плівка закінчилась');
+  if (!currentCamera().digital && state.count >= MAX_FRAMES) return toast('Плівка закінчилась');
   if (!pipeline.supported) return toast('WebGL недоступний на цьому пристрої');
   if (!els.video.videoWidth) return toast('Камера ще не готова');
 
@@ -447,7 +566,7 @@ async function shoot() {
     if (state.flash) els.flash.classList.add('strong');
 
     const camera = currentCamera();
-    const film = currentFilm();
+    const film = camera.digital ? camera.look : currentFilm(); // цифрова камера має власний «look» замість плівки
     const g = cropGeometry();
 
     offscreen.width = g.w;
@@ -457,7 +576,7 @@ async function shoot() {
     torchOn = false;
 
     const seed = newSeed();
-    const frame = rollFrame(seed, { flash: state.flash, leakMul: camera.leakMul });
+    const frame = rollFrame(seed, { flash: state.flash, leakMul: camera.leakMul, digital: camera.digital });
     // якщо ліхтарик справді світив, імітації потрібно менше
     if (torchFired) frame.flash *= 0.5;
 
@@ -470,24 +589,40 @@ async function shoot() {
     const params = computeParams(camera, dev.film, frame, lut, overlay);
     pipeline.render(offscreen, params);
     const blob = await pipeline.toBlob('image/jpeg', 0.92);
+    const thumb = await makeThumb(els.out);
 
-    state.count += 1;
+    // цифрові кадри мають окремий лічильник, плівку вони не витрачають
+    let n;
+    if (camera.digital) n = state.digitalCount += 1;
+    else n = state.count += 1;
     writeStore();
     renderCounter();
 
-    const name = `film-${stamp(new Date())}-${String(state.count).padStart(2, '0')}.jpg`;
+    const name = `film-${stamp(new Date())}-${String(n).padStart(2, '0')}.jpg`;
     state.last = { blob, name };
-    const shot = { n: state.count, camera: camera.id, film: dev.film.id, developed: dev.info, frame, params };
+    const shot = { n, camera: camera.id, film: dev.film.id, developed: dev.info, frame, params };
     window.filmDebug = { ...window.filmDebug, last: shot, pipeline };
     console.log(`[кадр ${shot.n}] ${camera.id} + ${dev.film.id}`, frame, dev.info || '');
 
     const notes = frame.events.map((e) => EVENT_NAMES[e]).filter(Boolean);
     els.caption.textContent =
-      `Кадр ${state.count} з ${MAX_FRAMES} · ${camera.name} · ${film.name}` +
+      (camera.digital
+        ? `Кадр ${n} · ${camera.name} · цифровий сенсор, ${film.name}`
+        : `Кадр ${n} з ${MAX_FRAMES} · ${camera.name} · ${film.name}`) +
       (dev.info ? ` (${dev.info.text})` : '') +
       (notes.length ? ` · ${notes.join(', ')}` : '');
+    addToRoll({
+      id: `${Date.now()}-${n}`,
+      n,
+      name,
+      blob,
+      thumb,
+      caption: els.caption.textContent,
+      digital: !!camera.digital,
+      time: Date.now(),
+    });
     els.print.hidden = false;
-    if (state.count >= MAX_FRAMES) toast('Плівка закінчилась');
+    if (!camera.digital && state.count >= MAX_FRAMES) toast('Плівка закінчилась');
   } catch (err) {
     console.error(err);
     toast('Не вдалося проявити кадр');
@@ -501,31 +636,170 @@ els.shutter.addEventListener('click', shoot);
 
 // --- збереження ---------------------------------------------------------------
 
-async function saveLast() {
-  const last = state.last;
-  if (!last) return;
-  const file = new File([last.blob], last.name, { type: 'image/jpeg' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file] });
-      return;
-    } catch (err) {
-      if (err && err.name === 'AbortError') return;
-      console.warn('share не вдався, завантажуємо файл:', err);
-    }
-  }
-  const url = URL.createObjectURL(last.blob);
+function download({ blob, name }) {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = last.name;
+  a.download = name;
   document.body.append(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+/** Віддає кадри користувачу: листок «Поділитися» з усіма файлами, а якщо його немає, звичайні завантаження. */
+async function deliver(items) {
+  if (!items.length) return;
+  const files = items.map((it) => new File([it.blob], it.name, { type: 'image/jpeg' }));
+  if (navigator.canShare && navigator.canShare({ files })) {
+    try {
+      await navigator.share({ files });
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+      console.warn('share не вдався, завантажуємо файли:', err);
+    }
+  }
+  for (let i = 0; i < items.length; i++) {
+    download(items[i]);
+    if (i < items.length - 1) await sleep(300); // браузери не люблять купу завантажень одночасно
+  }
+  if (items.length > 1) toast(`Завантажено файлів: ${items.length}`);
+}
+
+const saveLast = () => (state.last ? deliver([state.last]) : undefined);
+
 els.save.addEventListener('click', saveLast);
 els.close.addEventListener('click', () => { els.print.hidden = true; });
+
+// --- стрічка фото -------------------------------------------------------------
+
+const objectUrls = new Map(); // id → { thumb, full }
+let viewing = null;
+
+function urlsOf(id) {
+  if (!objectUrls.has(id)) objectUrls.set(id, {});
+  return objectUrls.get(id);
+}
+function thumbUrl(shot) {
+  const u = urlsOf(shot.id);
+  if (!u.thumb) u.thumb = URL.createObjectURL(shot.thumb || shot.blob);
+  return u.thumb;
+}
+function forgetUrls(id) {
+  const u = objectUrls.get(id);
+  if (!u) return;
+  if (u.thumb) URL.revokeObjectURL(u.thumb);
+  if (u.full) URL.revokeObjectURL(u.full);
+  objectUrls.delete(id);
+}
+
+/** Мініатюра останнього кадру з лічильником на кнопці камери. */
+function renderRollButton() {
+  const last = state.roll[state.roll.length - 1];
+  els.galleryBtn.classList.toggle('empty', !last);
+  els.galleryThumb.style.backgroundImage = last ? `url("${thumbUrl(last)}")` : '';
+  els.galleryBadge.hidden = !last;
+  els.galleryBadge.textContent = String(state.roll.length);
+  els.galleryBtn.setAttribute('aria-label', last ? `Стрічка фото: ${state.roll.length}` : 'Стрічка фото');
+}
+
+function renderGallery() {
+  const count = state.roll.length;
+  els.galleryTitle.textContent = count ? `Стрічка · ${count}` : 'Стрічка';
+  els.galleryEmpty.hidden = count > 0;
+  els.gallerySaveAll.disabled = count === 0;
+  els.galleryGrid.replaceChildren(
+    ...[...state.roll].reverse().map((shot) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('aria-label', `Кадр ${shot.n}`);
+      const img = document.createElement('img');
+      img.src = thumbUrl(shot);
+      img.alt = '';
+      const num = document.createElement('span');
+      num.className = 'num';
+      num.textContent = String(shot.n);
+      b.append(img, num);
+      b.addEventListener('click', () => openViewer(shot));
+      return b;
+    }),
+  );
+}
+
+function addToRoll(shot) {
+  state.roll.push(shot);
+  saveShot(shot); // у фоні: якщо IndexedDB недоступний, кадр лишається лише в пам'яті
+  renderRollButton();
+  if (!els.gallery.hidden) renderGallery();
+}
+
+function clearRoll() {
+  [...objectUrls.keys()].forEach(forgetUrls);
+  state.roll = [];
+  state.last = null;
+  clearShots();
+  closeViewer();
+  renderRollButton();
+  renderGallery();
+}
+
+async function makeThumb(canvas) {
+  const k = 360 / Math.max(canvas.width, canvas.height);
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(canvas.width * k));
+  c.height = Math.max(1, Math.round(canvas.height * k));
+  c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height);
+  return new Promise((resolve) => c.toBlob((b) => resolve(b), 'image/jpeg', 0.8));
+}
+
+function openViewer(shot) {
+  viewing = shot;
+  const u = urlsOf(shot.id);
+  if (!u.full) u.full = URL.createObjectURL(shot.blob);
+  els.viewerImg.src = u.full;
+  els.viewerCaption.textContent = shot.caption || '';
+  els.viewer.hidden = false;
+}
+
+function closeViewer() {
+  if (viewing) {
+    const u = objectUrls.get(viewing.id);
+    if (u && u.full) {
+      URL.revokeObjectURL(u.full);
+      u.full = null;
+    }
+  }
+  viewing = null;
+  els.viewer.hidden = true;
+  els.viewerImg.removeAttribute('src');
+}
+
+els.galleryBtn.addEventListener('click', () => {
+  renderGallery();
+  els.gallery.hidden = false;
+});
+els.galleryClose.addEventListener('click', () => { els.gallery.hidden = true; });
+els.gallerySaveAll.addEventListener('click', () => deliver(state.roll));
+els.viewerBack.addEventListener('click', closeViewer);
+els.viewerSave.addEventListener('click', () => (viewing ? deliver([viewing]) : undefined));
+els.viewerDelete.addEventListener('click', () => {
+  if (!viewing || !confirm('Видалити цей кадр?')) return;
+  const { id, name } = viewing;
+  closeViewer();
+  state.roll = state.roll.filter((s) => s.id !== id);
+  if (state.last && state.last.name === name) state.last = null;
+  forgetUrls(id);
+  deleteShot(id);
+  renderRollButton();
+  renderGallery();
+});
+
+loadShots().then((shots) => {
+  if (!shots.length) return;
+  state.roll = shots;
+  renderRollButton();
+});
 
 // --- старт --------------------------------------------------------------------
 

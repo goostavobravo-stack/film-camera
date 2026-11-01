@@ -43,11 +43,15 @@
           <div class="finder-marks" aria-hidden="true"></div>
           <div class="flash" id="flash" aria-hidden="true"></div>
           <div class="glare" aria-hidden="true"></div>
+          <button class="chrome-btn small flash-btn" id="flash-btn" type="button" aria-pressed="false" aria-label="Спалах">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 5 13.5h5.5L9 22l9.5-12H13z"/></svg>
+          </button>
+          <div class="lens-picker" id="lens-picker" role="group" aria-label="Модуль камери" hidden></div>
           <button class="finder-msg" id="finder-msg" type="button" hidden></button>
         </div>
       </div>
 
-      <div class="controls">
+      <div class="controls" id="controls">
         <label class="well">
           <span class="engrave">Камера</span>
           <span class="pill-wrap">
@@ -77,8 +81,9 @@
     </section>
 
     <footer class="bottom">
-      <button class="chrome-btn flash-btn" id="flash-btn" type="button" aria-pressed="false" aria-label="Спалах">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 5 13.5h5.5L9 22l9.5-12H13z"/></svg>
+      <button class="thumb-btn" id="gallery-btn" type="button" aria-label="Стрічка фото">
+        <span class="thumb-img" id="gallery-thumb"></span>
+        <b class="thumb-badge" id="gallery-badge" hidden>0</b>
       </button>
 
       <button class="shutter" id="shutter" type="button" aria-label="Спуск"><span></span></button>
@@ -97,6 +102,28 @@
     <div class="print-bar">
       <button type="button" id="close" class="ios-btn">Далі</button>
       <button type="button" id="save" class="ios-btn blue">Зберегти</button>
+    </div>
+  </section>
+
+  <section class="gallery" id="gallery" hidden aria-label="Стрічка фото">
+    <header class="nav-bar"><h2 id="gallery-title">Стрічка</h2></header>
+    <div class="gallery-scroll">
+      <div class="gallery-grid" id="gallery-grid"></div>
+      <p class="gallery-empty" id="gallery-empty">Тут з'являться всі кадри з поточної плівки. Коли перемотаєте плівку, вони видаляться.</p>
+    </div>
+    <div class="print-bar">
+      <button type="button" id="gallery-close" class="ios-btn">Закрити</button>
+      <button type="button" id="gallery-save-all" class="ios-btn blue">Зберегти все</button>
+    </div>
+  </section>
+
+  <section class="viewer" id="viewer" hidden aria-label="Кадр">
+    <div class="viewer-stage"><img id="viewer-img" alt=""></div>
+    <p class="print-caption" id="viewer-caption"></p>
+    <div class="print-bar">
+      <button type="button" id="viewer-back" class="ios-btn">Назад</button>
+      <button type="button" id="viewer-delete" class="ios-btn red">Видалити</button>
+      <button type="button" id="viewer-save" class="ios-btn blue">Зберегти</button>
     </div>
   </section>
 

@@ -61,6 +61,13 @@ export const FRAME_LIMITS = {
   softFocusChance: 0.1,
   softFocusAmount: [0.25, 0.7],
   flashPower: [0.8, 1.2],
+  // цифрова камера: автоекспозиція стабільна, нічого не протікає і не засвічується
+  digital: {
+    exposureEV: [-0.1, 0.1],
+    whiteBalanceK: [-80, 80],
+    whiteBalanceTint: [-1, 1],
+    grainMul: [0.9, 1.1],
+  },
 };
 
 /** Кадр без жодного випадкового ефекту. */
@@ -87,18 +94,20 @@ const LEAK_WARM = [1.0, 0.6, 0.15]; // оранжевий
  *
  * opts.flash    спалах увімкнено: кадр отримує силу спалаху flashPower
  * opts.leakMul  множник шансу світлової протічки (дешеві пластикові камери течуть частіше)
+ * opts.digital  цифрова камера: вузькі межі автоекспозиції, без протічок, пилу, засвіту й м'якого фокуса
  */
 export function rollFrame(seed, opts = {}) {
   const rng = createRng(seed);
   const L = FRAME_LIMITS;
+  const S = opts.digital ? L.digital : L;
   const events = [];
 
   const frame = {
     seed: hashSeed(seed),
-    exposureEV: rng.uniform(...L.exposureEV),
-    whiteBalanceK: rng.uniform(...L.whiteBalanceK),
-    whiteBalanceTint: rng.uniform(...L.whiteBalanceTint),
-    grainMul: rng.uniform(...L.grainMul),
+    exposureEV: rng.uniform(...S.exposureEV),
+    whiteBalanceK: rng.uniform(...S.whiteBalanceK),
+    whiteBalanceTint: rng.uniform(...S.whiteBalanceTint),
+    grainMul: rng.uniform(...S.grainMul),
     leak: null,
     dust: null,
     overexposeEV: 0,
@@ -106,6 +115,14 @@ export function rollFrame(seed, opts = {}) {
     flash: 0,
     events,
   };
+
+  if (opts.digital) {
+    if (opts.flash) {
+      frame.flash = rng.uniform(...L.flashPower);
+      events.push('flash');
+    }
+    return frame;
+  }
 
   const leakChance = Math.min(0.6, rng.uniform(...L.lightLeakChance) * (opts.leakMul ?? 1));
   if (rng.chance(leakChance)) {
