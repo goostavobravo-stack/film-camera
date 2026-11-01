@@ -26,7 +26,13 @@ import { createRng } from './random.js';
 
 export const GRAIN_TEX_SIZE = 256;
 /** Ширина кадру в пікселях, при якій grainSize = 1 дає зернину завширшки 1 піксель. */
-export const GRAIN_REF_WIDTH = 1500;
+export const GRAIN_REF_WIDTH = 1600;
+/** Скільки пікселів готового кадру займає один піксель текстури при grainSize = 1 і ширині GRAIN_REF_WIDTH. */
+export const GRAIN_PX_PER_SIZE = 0.9;
+/** Менше за це зерно перетворюється на дрібний цифровий пісок, тому нижче не опускаємося. */
+export const GRAIN_MIN_PX = 0.85;
+/** Сила зерна в сигналі (частка діапазону) при grainAmount = 1 для півтонів. */
+export const GRAIN_STRENGTH = 0.045;
 /** Одне σ шуму в байтах текстури (128 ± 40·σ). Шейдер знає це число. */
 export const GRAIN_TEX_SIGMA = 40;
 
@@ -71,7 +77,9 @@ function blurWrapped(src, size, sigma) {
  * Текстура зерна RGBA (size×size), чотири незалежні поля одиничної дисперсії, у байтах: 128 + 40·значення.
  * Детермінована: той самий seed дає ту саму текстуру.
  */
-export function buildGrainTexture(size = GRAIN_TEX_SIZE, seed = 1991) {
+export const GRAIN_SHAPE = { softSigma: 0.55, lowSigma: 2.0, lowWeight: 0.8 };
+
+export function buildGrainTexture(size = GRAIN_TEX_SIZE, seed = 1991, shape = GRAIN_SHAPE) {
   const rng = createRng(seed);
   const out = new Uint8Array(size * size * 4);
   const n = size * size;
@@ -85,12 +93,12 @@ export function buildGrainTexture(size = GRAIN_TEX_SIZE, seed = 1991) {
       white[i] = m * Math.cos(2 * Math.PI * v);
       if (i + 1 < n) white[i + 1] = m * Math.sin(2 * Math.PI * v);
     }
-    const soft = blurWrapped(white, size, 0.8); // грудочки
-    const low = blurWrapped(white, size, 3.0); // великі плями, які треба прибрати
+    const soft = blurWrapped(white, size, shape.softSigma); // грудочки
+    const low = blurWrapped(white, size, shape.lowSigma); // великі плями, які треба прибрати
     const g = new Float32Array(n);
     let mean = 0;
     for (let i = 0; i < n; i++) {
-      g[i] = soft[i] - low[i];
+      g[i] = soft[i] - shape.lowWeight * low[i];
       mean += g[i];
     }
     mean /= n;
@@ -100,6 +108,11 @@ export function buildGrainTexture(size = GRAIN_TEX_SIZE, seed = 1991) {
     for (let i = 0; i < n; i++) out[i * 4 + ch] = clamp(Math.round(128 + ((g[i] - mean) / std) * GRAIN_TEX_SIGMA), 0, 255);
   }
   return out;
+}
+
+/** Розмір зернини в пікселях готового кадру (текстура вибирається з цим кроком). */
+export function grainCellPx(grainSize, width) {
+  return Math.max(GRAIN_MIN_PX, (grainSize * width * GRAIN_PX_PER_SIZE) / GRAIN_REF_WIDTH);
 }
 
 /** Експозиція → множник зерна: недоекспозиція (EV < 0) його збільшує, переекспозиція зменшує. */

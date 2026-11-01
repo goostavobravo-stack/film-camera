@@ -1,7 +1,6 @@
 // Профілі камер (лінз): тільки геометрія й оптика, колір залежить від плівки.
 // Необов'язкове поле leakMul множить шанс світлової протічки (щілини в пластиковому корпусі).
 // format: 'medium' для камер на плівці 120 (зерно дрібніше, див. grain.js).
-// finder: вигляд видошукача камери: rangefinder, slr, compact, zone, toy, evf (див. viewfinder.js).
 
 /** Допустимі межі полів профілю. sharpness < 0 дає м'якість. */
 export const CAMERA_LIMITS = {
@@ -32,7 +31,6 @@ export const NEUTRAL_CAMERA = {
 export const CAMERAS = [
   {
     id: 'leica',
-    finder: 'rangefinder',
     name: 'Leica M6',
     blurb: 'м\'який мікроконтраст, ледь помітна віньєтка',
     vignetteStrength: 0.25,
@@ -47,7 +45,6 @@ export const CAMERAS = [
   {
     // Цифрова камера: без плівки. Власний «Leica Look» живе в look і замінює профіль плівки.
     id: 'leica-q3',
-    finder: 'evf',
     name: 'Leica Q3',
     digital: true,
     blurb: 'цифрова повнокадрова, Summilux 28 f/1.7: різка, глибокі чорні, чистий колір',
@@ -87,7 +84,6 @@ export const CAMERAS = [
   },
   {
     id: 'contax-t2',
-    finder: 'compact',
     name: 'Contax T2',
     blurb: 'гострий Zeiss, високий контраст',
     vignetteStrength: 0.2,
@@ -101,7 +97,6 @@ export const CAMERAS = [
   },
   {
     id: 'canon-ae1',
-    finder: 'slr',
     name: 'Canon AE-1',
     blurb: 'класична дзеркалка, рівна картинка',
     vignetteStrength: 0.3,
@@ -115,7 +110,6 @@ export const CAMERAS = [
   },
   {
     id: 'olympus-mju2',
-    finder: 'compact',
     name: 'Olympus mju-II',
     blurb: 'компакт: яскраві світла, свічення',
     vignetteStrength: 0.3,
@@ -129,7 +123,6 @@ export const CAMERAS = [
   },
   {
     id: 'yashica-t4',
-    finder: 'compact',
     name: 'Yashica T4',
     blurb: 'компакт з м\'яким світінням у світлах',
     vignetteStrength: 0.35,
@@ -143,7 +136,6 @@ export const CAMERAS = [
   },
   {
     id: 'zenit-e',
-    finder: 'slr',
     name: 'Зеніт-Е',
     blurb: 'радянська дзеркалка: м\'яко й соковито',
     vignetteStrength: 0.4,
@@ -157,7 +149,6 @@ export const CAMERAS = [
   },
   {
     id: 'lomo-lca',
-    finder: 'zone',
     name: 'Lomo LC-A',
     blurb: 'сильна віньєтка, насичені кути',
     vignetteStrength: 0.7,
@@ -172,7 +163,6 @@ export const CAMERAS = [
   {
     id: 'holga',
     format: 'medium', // плівка 120: велика площа негатива, зерно дрібніше, ніж у 35 мм
-    finder: 'toy',
     name: 'Holga 120N',
     blurb: 'пластикова лінза, протічки світла',
     vignetteStrength: 0.75,
@@ -188,7 +178,6 @@ export const CAMERAS = [
   {
     id: 'diana',
     format: 'medium', // плівка 120: велика площа негатива, зерно дрібніше, ніж у 35 мм
-    finder: 'toy',
     name: 'Diana F+',
     blurb: 'мильна лінза, дуже м\'яко, багато протічок',
     vignetteStrength: 0.85,

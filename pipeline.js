@@ -12,7 +12,7 @@
 import { createRng } from './random.js';
 import { TINT_LIMIT } from './films.js';
 import {
-  GRAIN_REF_WIDTH, GRAIN_TEX_SIGMA, GRAIN_TEX_SIZE, buildGrainTexture, exposureGrainMul, formatGrain,
+  GRAIN_STRENGTH, GRAIN_TEX_SIGMA, GRAIN_TEX_SIZE, buildGrainTexture, exposureGrainMul, formatGrain, grainCellPx,
 } from './grain.js';
 
 export const MAX_OUTPUT_SIZE = 2048;
@@ -478,7 +478,7 @@ void main() {
     float Lg = dot(c, LUMA);
     float w = mix(1.5, 0.55, smoothstep(0.0, 0.85, Lg));
     w *= (0.55 + 0.45 * smoothstep(0.0, 0.05, Lg)) * (1.0 - 0.5 * smoothstep(0.85, 1.0, Lg));
-    c += n * uGrain * 0.07 * w;
+    c += n * uGrain * ${GRAIN_STRENGTH} * w;
   }
 
   // крива плівки (tonecurve + канали) і необов'язковий 3D LUT
@@ -909,10 +909,8 @@ export class FilmPipeline {
     gl.uniform3fv(loc(f, 'uHighTint'), p.highlightTint);
     gl.uniform1f(loc(f, 'uGrain'), p.grainAmount);
     // розмір зерна відносно ширини кадру: однаковий вигляд на превʼю й на знімку
-    gl.uniform1f(loc(f, 'uGrainSize'), Math.max(1, (p.grainSize * w) / GRAIN_REF_WIDTH));
-    // у видошукачі зерно мерехтить саме (grainSeed), а решта випадковості лишається стабільною
-    const gs = p.grainSeed ?? p.seed;
-    gl.uniform2f(loc(f, 'uGrainSeed'), (gs % 4099) * 7.13, ((gs >>> 12) % 4093) * 3.71);
+    gl.uniform1f(loc(f, 'uGrainSize'), grainCellPx(p.grainSize, w));
+    gl.uniform2f(loc(f, 'uGrainSeed'), (p.seed % 4099) * 7.13, ((p.seed >>> 12) % 4093) * 3.71);
     gl.uniform1f(loc(f, 'uGrainClump'), p.grainClump);
     gl.uniform1f(loc(f, 'uGrainChroma'), p.grainChroma);
     gl.uniform1f(loc(f, 'uHasDust'), hasOverlay ? 1 : 0);

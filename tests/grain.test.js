@@ -5,7 +5,8 @@ import { FILMS } from '../films.js';
 import { NEUTRAL_FRAME } from '../random.js';
 import { computeParams } from '../pipeline.js';
 import {
-  GRAIN_REF_WIDTH, GRAIN_TEX_SIGMA, GRAIN_TEX_SIZE, buildGrainTexture, exposureGrainMul, formatGrain,
+  GRAIN_MIN_PX, GRAIN_REF_WIDTH, GRAIN_STRENGTH, GRAIN_TEX_SIGMA, GRAIN_TEX_SIZE, buildGrainTexture, exposureGrainMul,
+  formatGrain, grainCellPx,
 } from '../grain.js';
 
 const S = GRAIN_TEX_SIZE;
@@ -34,7 +35,7 @@ test('текстура зерна: чотири поля з нульовим с�
 test('текстура зерна: смуговий спектр (сусіди корелюють, великих плям немає)', () => {
   const r = field(0);
   const lag1 = corr(r, r, 1, 0);
-  assert.ok(lag1 > 0.4 && lag1 < 0.8, `сусідні пікселі ${lag1}: це грудочки, не білий шум`);
+  assert.ok(lag1 > 0.15 && lag1 < 0.6, `сусідні пікселі ${lag1}: дрібні грудочки, не білий шум`);
   for (const lag of [6, 10, 16, 32]) {
     assert.ok(Math.abs(corr(r, r, lag, 0)) < 0.05, `лаг ${lag}: низьких частот (плям) бути не повинно`);
     assert.ok(Math.abs(corr(r, r, 0, lag)) < 0.05);
@@ -93,5 +94,40 @@ test('зерно росте з чутливістю плівки', () => {
   assert.ok(grain('kodak-gold-200') < grain('kodak-ultramax-400'));
   assert.ok(grain('fuji-velvia-50') < grain('fuji-superia-400'));
   assert.ok(grain('kodak-portra-400') < grain('kodak-tri-x-400'));
-  assert.equal(GRAIN_REF_WIDTH, 1500);
+  assert.equal(GRAIN_REF_WIDTH, 1600);
+});
+
+test('зерно дрібне: зернина на готовому кадрі близько піксельного розміру, а не плями', () => {
+  for (const w of [1080, 1620, 2048]) {
+    for (const film of FILMS) {
+      const px = grainCellPx(film.grainSize, w);
+      assert.ok(px >= GRAIN_MIN_PX && px <= 2.4, `${film.id} при ${w}px: ${px}`);
+    }
+  }
+  // відносно ширини кадру розмір стабільний (вище мінімуму), тож превʼю й знімок схожі
+  const a = grainCellPx(1.5, 1600);
+  const b = grainCellPx(1.5, 3200);
+  assert.ok(Math.abs(b / a - 2) < 1e-9);
+  assert.equal(grainCellPx(0.5, 400), GRAIN_MIN_PX);
+});
+
+test('амплітуда зерна реалістична: у півтонах не більше ~12 рівнів з 255 навіть у Tri-X', () => {
+  const peak = (f) => f.grainAmount * GRAIN_STRENGTH * 1.5 * 255; // 1.5 = найбільша вага в тінях
+  const stable = FILMS.filter((f) => !f.special);
+  for (const f of stable) assert.ok(peak(f) <= 12, `${f.id}: ${peak(f).toFixed(1)}`);
+  const gold = peak(FILMS.find((f) => f.id === 'kodak-gold-200'));
+  assert.ok(gold < 8, `Gold 200: ${gold.toFixed(1)}`);
+  assert.ok(GRAIN_STRENGTH <= 0.05);
+});
+
+test('зерно: плівки грудкуваті й кольорові, ч/б без кольорового зерна, цифровий сенсор піксельний', () => {
+  for (const film of FILMS) {
+    const p = computeParams(CAMERAS[0], film, NEUTRAL_FRAME);
+    assert.equal(p.grainClump, 1, `${film.id}: плівкові грудочки`);
+    assert.ok(p.grainChroma >= 0 && p.grainChroma <= 1);
+    if (film.saturation === 0) assert.equal(p.grainChroma, 0, `${film.id}: ч/б без хроматичного зерна`);
+    else assert.ok(p.grainChroma > 0, `${film.id}: барвникові хмарки`);
+  }
+  const q3 = CAMERAS.find((c) => c.id === 'leica-q3');
+  assert.equal(computeParams(q3, q3.look, NEUTRAL_FRAME).grainClump, 0);
 });

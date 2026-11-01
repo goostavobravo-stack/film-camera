@@ -3,7 +3,6 @@ import { FILMS, developFilm } from './films.js';
 import { FilmPipeline, MAX_OUTPUT_SIZE, computeParams, formatDateStamp, loadLut } from './pipeline.js';
 import { newSeed, rollFrame } from './random.js';
 import { clearShots, deleteShot, loadShots, saveShot } from './store.js';
-import { buildPreviewParams, finderHtml, glassStyle } from './viewfinder.js';
 
 const MAX_FRAMES = 36;
 const STORE_KEY = 'film-camera-v1';
@@ -13,8 +12,6 @@ const demoMode = new URLSearchParams(location.search).has('demo');
 const $ = (id) => document.getElementById(id);
 const els = {
   video: $('video'),
-  preview: $('preview'),
-  vf: $('vf'),
   finder: $('finder'),
   msg: $('finder-msg'),
   flash: $('flash'),
@@ -168,10 +165,6 @@ function fillFilmSelect() {
 function renderSelection() {
   const film = currentFilm();
   const cam = currentCamera();
-  previewSeed = newSeed(); // для «Просрочки» і «Намотки» превʼю показує один можливий результат
-  els.vf.innerHTML = finderHtml(cam);
-  Object.entries(glassStyle(cam.id)).forEach(([k, val]) => els.vf.style.setProperty(k, val));
-  els.finder.dataset.finder = cam.finder || '';
   els.controls.classList.toggle('digital', !!cam.digital);
   els.camInfo.textContent = `${cam.name} — ${cam.blurb}`;
   if (cam.digital) {
@@ -536,7 +529,6 @@ async function shoot() {
 
     const name = `film-${stamp(new Date())}-${String(n).padStart(2, '0')}.jpg`;
     state.last = { blob, name };
-    previewSeed = newSeed(); // наступний можливий результат «Просрочки» / «Намотки» у видошукачі
     const shot = { n, camera: camera.id, film: dev.film.id, developed: dev.info, frame, params };
     window.filmDebug = { ...window.filmDebug, last: shot, pipeline };
     console.log(`[кадр ${shot.n}] ${camera.id} + ${dev.film.id}`, frame, dev.info || '');
@@ -857,52 +849,6 @@ loadShots().then((shots) => {
   state.roll = shots;
   renderRollButton();
 });
-
-// --- живе превʼю у видошукачі -----------------------------------------------------
-// Кадр з камери іде через той самий пайплайн, що й знімок (лінза, плівка, зерно), але з меншою
-// роздільністю й без випадкових подій. Вихідне відео лишається джерелом, але приховане (клас .live).
-
-const PREVIEW_MAX = 640;
-const PREVIEW_INTERVAL_MS = 40; // ~25 кадрів/с: економимо батарею
-const previewPipeline = new FilmPipeline(els.preview);
-const previewSource = document.createElement('canvas');
-let previewSeed = newSeed();
-let previewCache = { key: '', params: null };
-let lastPreview = 0;
-let previewTick = 0;
-
-const overlaysOpen = () => !els.print.hidden || !els.gallery.hidden || !els.viewer.hidden;
-
-function renderPreview(ts) {
-  requestAnimationFrame(renderPreview);
-  if (!previewPipeline.supported || ts - lastPreview < PREVIEW_INTERVAL_MS) return;
-  if (document.hidden || !els.video.videoWidth || overlaysOpen()) return;
-  lastPreview = ts;
-
-  const g = cropGeometry();
-  const k = Math.min(1, PREVIEW_MAX / Math.max(g.sw, g.sh));
-  const w = Math.max(1, Math.round(g.sw * k));
-  const h = Math.max(1, Math.round(g.sh * k));
-  if (previewSource.width !== w || previewSource.height !== h) {
-    previewSource.width = w;
-    previewSource.height = h;
-  }
-  previewSource.getContext('2d').drawImage(els.video, g.sx, g.sy, g.sw, g.sh, 0, 0, w, h);
-
-  const key = `${state.cameraId}|${state.filmId}|${state.flash}|${previewSeed}`;
-  if (previewCache.key !== key) {
-    previewCache = { key, params: buildPreviewParams(currentCamera(), currentFilm(), previewSeed, { flash: state.flash }) };
-  }
-  previewCache.params.grainSeed = ++previewTick; // зерно мерехтить, як у кіно, а решта вигляду стабільна
-  try {
-    previewPipeline.render(previewSource, previewCache.params);
-    els.finder.classList.add('live');
-  } catch (err) {
-    console.warn('Превʼю недоступне, показуємо відео як є:', err);
-    els.finder.classList.remove('live');
-  }
-}
-if (previewPipeline.supported) requestAnimationFrame(renderPreview);
 
 // --- старт --------------------------------------------------------------------
 
