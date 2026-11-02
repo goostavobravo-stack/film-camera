@@ -96,13 +96,24 @@ export function estimateZoom(mainGray, teleGray, w, h, { candidates = TELE_CANDI
 export const zoomLabel = (factor) => `${Number.isInteger(factor) ? factor : factor.toFixed(1)}×`;
 
 /**
- * Початкове припущення про збільшення телеоб'єктива, поки його не виміряно. Телефони з 5× (Pro 16 і новіші)
- * мають великий екран; решта з телеоб'єктивом дає 3×. Розмір екрана лише підказка: після першого перемикання
- * застосунок вимірює справжнє збільшення.
+ * Що робити з телеоб'єктивом цього телефона: яке збільшення показати і чи варто його вимірювати.
+ * На iPhone модель видно з розміру екрана: Pro 16/17 (402×874) і Pro Max 16/17 (440×956) мають 5×, решта Pro 3×.
+ * Єдиний неоднозначний розмір 430×932: 14 Pro Max (3×) і 15 Pro Max (5×), тут збільшення вимірюється.
+ * Вимірювання на близьких предметах бреше (телеоб'єктив не фокусується, кадр розмитий і «схожий» на більше збільшення),
+ * тому там, де модель відома, його немає. На інших телефонах (Android) збільшення різне, його вимірюємо.
  */
-export function guessTeleFactor(screenW = 0, screenH = 0) {
+export function teleStrategy(screenW = 0, screenH = 0, userAgent = '') {
   const w = Math.min(screenW, screenH);
   const h = Math.max(screenW, screenH);
-  if ((w === 402 && h === 874) || (w === 440 && h === 956)) return 5;
-  return 3;
+  if (/iPhone/.test(userAgent)) {
+    if ((w === 402 && h === 874) || (w === 440 && h === 956)) return { guess: 5, measure: false, candidates: [5] };
+    if (w === 430 && h === 932) return { guess: 3, measure: true, candidates: [3, 5] };
+    return { guess: 3, measure: false, candidates: [3] };
+  }
+  return { guess: 3, measure: true, candidates: [2, 3, 5, 8] };
+}
+
+/** Початкове припущення про збільшення телеоб'єктива (для сумісності: без User-Agent вважаємо, що це iPhone). */
+export function guessTeleFactor(screenW = 0, screenH = 0) {
+  return teleStrategy(screenW, screenH, 'iPhone').guess;
 }

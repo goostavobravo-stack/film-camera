@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MIN_CONFIDENCE, TELE_CANDIDATES, estimateZoom, guessTeleFactor, ncc, sampleCrop, zoomLabel,
+  MIN_CONFIDENCE, TELE_CANDIDATES, estimateZoom, guessTeleFactor, ncc, sampleCrop, teleStrategy, zoomLabel,
 } from '../zoom.js';
 
 const W = 160;
@@ -108,4 +108,18 @@ test('підписи й припущення про збільшення', () =>
   assert.equal(guessTeleFactor(402, 874), 5);
   assert.equal(guessTeleFactor(440, 956), 5);
   assert.equal(guessTeleFactor(), 3);
+});
+
+test('teleStrategy: iPhone Pro знає свою модель за екраном, вимірює лише неоднозначний розмір', () => {
+  const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)';
+  assert.deepEqual(teleStrategy(393, 852, ua), { guess: 3, measure: false, candidates: [3] }, '15 Pro: 3×, без вимірювань');
+  assert.equal(teleStrategy(402, 874, ua).guess, 5);
+  assert.equal(teleStrategy(440, 956, ua).guess, 5);
+  assert.equal(teleStrategy(440, 956, ua).measure, false);
+  const amb = teleStrategy(430, 932, ua);
+  assert.equal(amb.measure, true);
+  assert.deepEqual(amb.candidates, [3, 5]);
+  const android = teleStrategy(412, 915, 'Mozilla/5.0 (Linux; Android 14)');
+  assert.equal(android.measure, true);
+  assert.ok(android.candidates.includes(3) && android.candidates.includes(5));
 });

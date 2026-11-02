@@ -6,7 +6,7 @@ import { createDrum } from './drum.js';
 import { createLever } from './lever.js';
 import { haptic } from './haptics.js';
 import { buildLensList } from './lenses.js';
-import { MIN_CONFIDENCE, estimateZoom, guessTeleFactor, zoomLabel } from './zoom.js';
+import { MIN_CONFIDENCE, estimateZoom, teleStrategy, zoomLabel } from './zoom.js';
 import { clearShots, darkStore, deleteShot, loadShots, saveShot } from './store.js';
 import { createLab } from './darkroom.js';
 
@@ -104,7 +104,7 @@ function writeStore() {
       date: state.date,
       ev: state.ev,
       lens: state.lensId,
-      zoom: state.zoomByLens,
+      zoom2: state.zoomByLens,
       mode: state.mode,
       drPhase: dr.phase,
       drEnd: dr.endReason,
@@ -138,7 +138,7 @@ const state = {
   date: saved.date !== false, // штамп дати за замовчуванням увімкнений
   ev: EV_STEPS.some((s) => s.id === saved.ev) ? saved.ev : 0, // поправка експозиції, EV
   lensId: typeof saved.lens === 'string' ? saved.lens : '', // вибраний модуль камери (deviceId), '' = основний
-  zoomByLens: saved.zoom && typeof saved.zoom === 'object' ? saved.zoom : {}, // виміряне збільшення телеоб'єктивів
+  zoomByLens: saved.zoom2 && typeof saved.zoom2 === 'object' ? saved.zoom2 : {}, // виміряне збільшення телеоб'єктивів (старі вимірювання zoom відкинуто: були неточні)
   roll: [], // кадри поточної плівки (дублюються в IndexedDB): { id, n, name, blob, thumb, caption, time }
   torch: false, // чи вміє поточна камера вмикати ліхтарик (iOS Safari не вміє)
   busy: false,
@@ -478,7 +478,8 @@ let lensBusy = false;
 
 const mainLens = () => lenses.find((l) => l.kind === 'wide') || lenses.find((l) => l.kind !== 'ultra' && l.kind !== 'tele') || lenses[0];
 /** Збільшення телеоб'єктива: виміряне, а поки не виміряно, припущення за екраном телефона. */
-const teleFactor = (lens) => state.zoomByLens[lens.id] || guessTeleFactor(screen.width, screen.height);
+const strategy = teleStrategy(screen.width, screen.height, navigator.userAgent);
+const teleFactor = (lens) => state.zoomByLens[lens.id] || strategy.guess;
 function lensLabel(lens) {
   if (lens.kind === 'tele') return zoomLabel(teleFactor(lens) >= 4 ? 5 : 3); // на кнопці лише 3× або 5×
   return lens.short;
@@ -547,7 +548,7 @@ async function selectLens(lens) {
   const main = mainLens();
   const wasMain = main && (activeLensId() || main.id) === main.id;
   // кадр основної камери беремо до перемикання: він потрібен, щоб виміряти збільшення телеоб'єктива
-  const before = wasMain && lens.kind === 'tele' && !state.zoomByLens[lens.id] && els.video.videoWidth ? grabGray() : null;
+  const before = strategy.measure && wasMain && lens.kind === 'tele' && !state.zoomByLens[lens.id] && els.video.videoWidth ? grabGray() : null;
   renderLenses();
   const prev = state.lensId;
   state.lensId = lens.id; // 1× теж відкривається за точним deviceId: це справді основний об'єктив, а не автовибір
@@ -574,7 +575,7 @@ async function measureTele(lens, before) {
   if (!els.video.videoWidth) return;
   const after = grabGray(before.w);
   if (after.w !== before.w || after.h !== before.h) return;
-  const { factor, score } = estimateZoom(before.gray, after.gray, before.w, before.h, { size: 64, shift: 3 });
+  const { factor, score } = estimateZoom(before.gray, after.gray, before.w, before.h, { size: 64, shift: 3, candidates: strategy.candidates });
   if (score >= MIN_CONFIDENCE) state.zoomByLens[lens.id] = factor;
 }
 
