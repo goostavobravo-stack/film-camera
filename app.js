@@ -13,8 +13,8 @@ const MAX_FRAMES = 36;
 const STORE_KEY = 'film-camera-v1';
 /** Поправка експозиції, як на камері: кроки по 1/3 EV. */
 const EV_STEPS = [
-  { id: -1, label: '−1' }, { id: -2 / 3, label: '−⅔' }, { id: -1 / 3, label: '−⅓' }, { id: 0, label: '0' },
-  { id: 1 / 3, label: '+⅓' }, { id: 2 / 3, label: '+⅔' }, { id: 1, label: '+1' },
+  { id: -1, label: '−1.0' }, { id: -2 / 3, label: '−0.7' }, { id: -1 / 3, label: '−0.3' }, { id: 0, label: '0.0' },
+  { id: 1 / 3, label: '+0.3' }, { id: 2 / 3, label: '+0.7' }, { id: 1, label: '+1.0' },
 ];
 const TORCH_WARMUP_MS = 450;
 const demoMode = new URLSearchParams(location.search).has('demo');
@@ -34,9 +34,6 @@ const els = {
   filmDrum: $('film-drum'),
   evDrum: $('ev-drum'),
   lensPicker: $('lens-picker'),
-  canister: $('canister'),
-  canisterBrand: $('canister-brand'),
-  canisterName: $('canister-name'),
   filmInfo: $('film-info'),
   camInfo: $('cam-info'),
   flashBtn: $('flash-btn'),
@@ -80,7 +77,6 @@ const EVENT_NAMES = {
   flash: 'спалах',
 };
 
-const BRAND_SHORT = { Fujifilm: 'Fuji', Lomography: 'Lomo', CineStill: 'Cine' }; // щоб вміщалося на етикетці касети
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -155,15 +151,19 @@ function renderCounter() {
 function renderSelection() {
   const film = currentFilm();
   const cam = currentCamera();
-  const [bg, fg] = film.label;
-  els.canister.style.setProperty('--lbl-bg', bg);
-  els.canister.style.setProperty('--lbl-fg', fg);
-  els.canisterBrand.textContent = ['Особливі', 'Без ефектів'].includes(film.brand) ? '' : BRAND_SHORT[film.brand] || film.brand;
-  els.canisterName.textContent = film.id === 'null' ? 'NULL' : film.iso === '?' || film.special === 'reel' ? film.name : `ISO ${film.iso}`;
-  els.filmInfo.textContent = isCleanMode()
-    ? 'Чистий режим: кадр без ефектів камери й плівки, як його віддав iPhone'
-    : `${film.name} · ISO ${film.iso} — ${film.blurb}`;
-  els.camInfo.textContent = `${cam.name} — ${cam.blurb}`;
+  const row = (value, note) => {
+    const v = document.createElement('b');
+    v.textContent = value;
+    const n = document.createElement('span');
+    n.textContent = note;
+    return [v, n];
+  };
+  els.filmInfo.replaceChildren(
+    ...(isCleanMode()
+      ? row('Чистий режим', 'без ефектів камери й плівки')
+      : row(film.iso === '?' ? film.name : `${film.name} · ISO ${film.iso}`, film.blurb)),
+  );
+  els.camInfo.replaceChildren(...row(cam.name, cam.blurb));
 }
 
 function renderFlash() {
@@ -451,7 +451,7 @@ const mainLens = () => lenses.find((l) => l.kind === 'wide') || lenses.find((l) 
 /** Збільшення телеоб'єктива: виміряне, а поки не виміряно, припущення за екраном телефона. */
 const teleFactor = (lens) => state.zoomByLens[lens.id] || guessTeleFactor(screen.width, screen.height);
 function lensLabel(lens) {
-  if (lens.kind === 'tele') return zoomLabel(teleFactor(lens));
+  if (lens.kind === 'tele') return zoomLabel(teleFactor(lens) >= 4 ? 5 : 3); // на кнопці лише 3× або 5×
   return lens.short;
 }
 /** Який модуль зараз у потоці: за deviceId треку, а якщо браузер його не каже, за вибором користувача. */
@@ -489,7 +489,7 @@ function renderLenses() {
 async function refreshLenses() {
   try {
     const devices = demoMode ? DEMO_DEVICES : await navigator.mediaDevices.enumerateDevices();
-    lenses = buildLensList(devices);
+    lenses = buildLensList(devices).filter((l) => ['ultra', 'wide', 'tele'].includes(l.kind)); // лише 0.5× / 1× / 3×(5×)
   } catch {
     lenses = [];
   }

@@ -27,12 +27,18 @@
         </div>
 
         <div class="plate-actions" role="group" aria-label="Спалах і дата">
-          <button class="chrome-btn small flash-btn" id="flash-btn" type="button" aria-pressed="false" aria-label="Спалах">
+          <div class="act">
+            <button class="chrome-btn small flash-btn" id="flash-btn" type="button" aria-pressed="false" aria-label="Спалах">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 5 13.5h5.5L9 22l9.5-12H13z"/></svg>
           </button>
-          <button class="chrome-btn small date-btn" id="date-btn" type="button" aria-pressed="true" aria-label="Дата на кадрі">
+            <span class="cap">Спалах</span>
+          </div>
+          <div class="act">
+            <button class="chrome-btn small date-btn" id="date-btn" type="button" aria-pressed="true" aria-label="Дата на кадрі">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm12 8v10H5V10h14z"/></svg>
           </button>
+            <span class="cap">Дата</span>
+          </div>
         </div>
 
         <div class="brand" aria-hidden="true">ПЛІВКА <b>36</b></div>
@@ -72,21 +78,15 @@
         </div>
 
         <div class="well film-well">
-          <div class="canister" id="canister" aria-hidden="true">
-            <i class="cap cap-top"></i>
-            <div class="can-label"><b id="canister-brand"></b><span id="canister-name"></span></div>
-            <i class="cap cap-bottom"></i>
-          </div>
-          <div class="film-pick">
-            <span class="engrave">Плівка</span>
-            <div class="drum" id="film-drum"></div>
-          </div>
+          <span class="engrave">Плівка</span>
+          <div class="drum" id="film-drum"></div>
         </div>
       </div>
 
-      <div class="plate" aria-live="polite">
-        <p id="film-info"></p>
-        <p id="cam-info"></p>
+      <!-- рідкокристалічне табло: що зараз вибрано -->
+      <div class="lcd" aria-live="polite">
+        <p class="lcd-row"><span class="lcd-key">Плівка</span><span class="lcd-val" id="film-info"></span></p>
+        <p class="lcd-row"><span class="lcd-key">Камера</span><span class="lcd-val" id="cam-info"></span></p>
       </div>
     </section>
 

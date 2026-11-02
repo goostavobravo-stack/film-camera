@@ -33,12 +33,12 @@ export const CAMERAS = [
     // Чистий режим: жодних оптичних ефектів. Разом з плівкою Null кадр лишається таким, як його віддав iPhone.
     ...NEUTRAL_CAMERA,
     id: 'iphone',
-    name: 'iPhone',
+    name: 'Чиста',
     blurb: 'без оптичних ефектів: кадр як його віддав телефон',
   },
   {
     id: 'leica',
-    name: 'Leica M6',
+    name: 'Дальномір',
     blurb: 'м\'який мікроконтраст, ледь помітна віньєтка',
     vignetteStrength: 0.25,
     vignetteRadius: 1.0,
@@ -51,8 +51,8 @@ export const CAMERAS = [
   },
   {
     id: 'contax-t2',
-    name: 'Contax T2',
-    blurb: 'гострий Zeiss, високий контраст',
+    name: 'Гострий 35',
+    blurb: 'гострий об\'єктив, високий контраст',
     vignetteStrength: 0.2,
     vignetteRadius: 1.05,
     edgeSoftness: 0.08,
@@ -64,7 +64,7 @@ export const CAMERAS = [
   },
   {
     id: 'canon-ae1',
-    name: 'Canon AE-1',
+    name: 'Дзеркалка',
     blurb: 'класична дзеркалка, рівна картинка',
     vignetteStrength: 0.3,
     vignetteRadius: 1.0,
@@ -77,7 +77,7 @@ export const CAMERAS = [
   },
   {
     id: 'olympus-mju2',
-    name: 'Olympus mju-II',
+    name: 'Яскравий 35',
     blurb: 'компакт: яскраві світла, свічення',
     vignetteStrength: 0.3,
     vignetteRadius: 0.9,
@@ -90,7 +90,7 @@ export const CAMERAS = [
   },
   {
     id: 'yashica-t4',
-    name: 'Yashica T4',
+    name: 'М\'який 35',
     blurb: 'компакт з м\'яким світінням у світлах',
     vignetteStrength: 0.35,
     vignetteRadius: 0.9,
@@ -103,7 +103,7 @@ export const CAMERAS = [
   },
   {
     id: 'zenit-e',
-    name: 'Зеніт-Е',
+    name: 'Радянська',
     blurb: 'радянська дзеркалка: м\'яко й соковито',
     vignetteStrength: 0.4,
     vignetteRadius: 0.85,
@@ -116,7 +116,7 @@ export const CAMERAS = [
   },
   {
     id: 'lomo-lca',
-    name: 'Lomo LC-A',
+    name: 'Віньєтка',
     blurb: 'сильна віньєтка, насичені кути',
     vignetteStrength: 0.7,
     vignetteRadius: 0.7,
@@ -130,7 +130,7 @@ export const CAMERAS = [
   {
     id: 'holga',
     format: 'medium', // плівка 120: велика площа негатива, зерно дрібніше, ніж у 35 мм
-    name: 'Holga 120N',
+    name: 'Пластик 120',
     blurb: 'пластикова лінза, протічки світла',
     vignetteStrength: 0.75,
     vignetteRadius: 0.6,
@@ -145,7 +145,7 @@ export const CAMERAS = [
   {
     id: 'diana',
     format: 'medium', // плівка 120: велика площа негатива, зерно дрібніше, ніж у 35 мм
-    name: 'Diana F+',
+    name: 'Мильна 120',
     blurb: 'мильна лінза, дуже м\'яко, багато протічок',
     vignetteStrength: 0.85,
     vignetteRadius: 0.55,

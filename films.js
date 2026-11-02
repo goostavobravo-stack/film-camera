@@ -90,7 +90,7 @@ const STOCKS = [
   {
     id: 'kodak-gold-200',
     brand: 'Kodak',
-    name: 'Kodak Gold 200',
+    name: 'C200 · Тепла',
     iso: 200,
     blurb: 'теплі жовтуваті світла, помірне зерно',
     label: ['#f2b705', '#a3161a'],
@@ -107,7 +107,7 @@ const STOCKS = [
   {
     id: 'kodak-ultramax-400',
     brand: 'Kodak',
-    name: 'Kodak Ultramax 400',
+    name: 'C400 · Щільна',
     iso: 400,
     blurb: 'щільні теплі кольори, помітне зерно',
     label: ['#e8a200', '#1d3b8a'],
@@ -124,7 +124,7 @@ const STOCKS = [
   {
     id: 'kodak-portra-400',
     brand: 'Kodak',
-    name: 'Kodak Portra 400',
+    name: 'C400 · Ніжна',
     iso: 400,
     blurb: 'ніжна шкіра, м\'які пастельні тони',
     label: ['#c9b48a', '#2b2b2b'],
@@ -141,7 +141,7 @@ const STOCKS = [
   {
     id: 'kodak-ektar-100',
     brand: 'Kodak',
-    name: 'Kodak Ektar 100',
+    name: 'C100 · Яскрава',
     iso: 100,
     blurb: 'дуже насичені червоні й сині, майже без зерна',
     label: ['#d7261e', '#f5f5f0'],
@@ -158,7 +158,7 @@ const STOCKS = [
   {
     id: 'kodak-ektachrome-e100',
     brand: 'Kodak',
-    name: 'Kodak Ektachrome E100',
+    name: 'S100 · Холодна',
     iso: 100,
     blurb: 'слайд: чисті холодні тони, глибокі чорні',
     label: ['#1e6bb8', '#f5f5f0'],
@@ -175,7 +175,7 @@ const STOCKS = [
   {
     id: 'kodak-tri-x-400',
     brand: 'Kodak',
-    name: 'Kodak Tri-X 400',
+    name: 'BW400 · Контраст',
     iso: 400,
     blurb: 'ч/б: високий контраст, велике зерно',
     label: ['#2a2a2a', '#f2c200'],
@@ -193,7 +193,7 @@ const STOCKS = [
   {
     id: 'fuji-c200',
     brand: 'Fujifilm',
-    name: 'Fujicolor C200',
+    name: 'C200 · Соковита',
     iso: 200,
     blurb: 'сочні зелені й блакитні, м\'які тіні',
     label: ['#1d8a43', '#f5f5f0'],
@@ -214,7 +214,7 @@ const STOCKS = [
   {
     id: 'fuji-superia-400',
     brand: 'Fujifilm',
-    name: 'Fujifilm Superia X-TRA 400',
+    name: 'C400 · Зелена',
     iso: 400,
     blurb: 'прохолодні зеленуваті тіні, жива зелень',
     label: ['#2aa05a', '#7a1020'],
@@ -231,7 +231,7 @@ const STOCKS = [
   {
     id: 'fuji-pro-400h',
     brand: 'Fujifilm',
-    name: 'Fujifilm Pro 400H',
+    name: 'C400 · Пастель',
     iso: 400,
     blurb: 'пастельні м\'які кольори, блакитно-м\'ятні тіні',
     label: ['#7fc8b5', '#1b3a34'],
@@ -248,7 +248,7 @@ const STOCKS = [
   {
     id: 'fuji-velvia-50',
     brand: 'Fujifilm',
-    name: 'Fujifilm Velvia 50',
+    name: 'S50 · Насичена',
     iso: 50,
     blurb: 'слайд: гранична насиченість і контраст',
     label: ['#4b9d2a', '#f2e300'],
@@ -266,7 +266,7 @@ const STOCKS = [
   {
     id: 'ilford-hp5-400',
     brand: 'Ilford',
-    name: 'Ilford HP5 Plus 400',
+    name: 'BW400 · М\'яка',
     iso: 400,
     blurb: 'ч/б: м\'який контраст, широкі півтони',
     label: ['#f2f2ee', '#1a1a1a'],
@@ -284,7 +284,7 @@ const STOCKS = [
   {
     id: 'cinestill-800t',
     brand: 'CineStill',
-    name: 'CineStill 800T',
+    name: 'T800 · Вольфрам',
     iso: 800,
     blurb: 'вольфрамовий баланс: синюватий день, червоне гало',
     label: ['#1c1c1c', '#ff4d2e'],
@@ -304,7 +304,7 @@ const STOCKS = [
   {
     id: 'lomo-purple',
     brand: 'Lomography',
-    name: 'LomoChrome Purple',
+    name: 'X200 · Пурпур',
     iso: 400,
     blurb: 'зелень стає пурпурною, небо зсувається в блакить',
     label: ['#6b2fa0', '#f5e9ff'],
@@ -322,7 +322,7 @@ const STOCKS = [
   {
     id: 'lomo-redscale',
     brand: 'Lomography',
-    name: 'Lomography Redscale XR',
+    name: 'X200 · Редскейл',
     iso: 200,
     blurb: 'проекспонована зворотним боком: червоно-жовтий',
     label: ['#c4281c', '#ffd23a'],
@@ -342,7 +342,7 @@ const STOCKS = [
   {
     id: 'agfa-vista-200',
     brand: 'Agfa',
-    name: 'Agfa Vista 200',
+    name: 'C200 · Червона',
     iso: 200,
     blurb: 'червоні відтінки, зеленувато-блакитні тіні',
     label: ['#d8231c', '#f5f5f0'],
@@ -516,7 +516,7 @@ function developReel(rng) {
   const film = {
     ...reel,
     id: `reel:${v.code}`,
-    name: `Намотка ${v.stock}`,
+    name: `Намотка ${v.code}`,
     tonecurve: v.tonecurve,
     channelCurves: {
       r: shiftCurve(v.channelCurves.r, jitter()),
@@ -558,7 +558,7 @@ function developReel(rng) {
   return {
     film,
     overlay,
-    info: { base: v.code, baseName: v.stock, text: `кіноплівка ${v.stock} у фотоапараті${remjet ? ', з ремджетом' : ''}` },
+    info: { base: v.code, baseName: v.stock, text: `кіноплівка ${v.code} у фотоапараті${remjet ? ', з ремджетом' : ''}` },
   };
 }
 

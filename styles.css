@@ -8,6 +8,8 @@
   --cream: #f3ead5;
   --amber: #ffb02e;
   --red: #c8321f;
+  /* технічний моноширинний шрифт: SF Mono на iOS, Menlo на macOS, Consolas на Windows */
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Roboto Mono", Consolas, "Liberation Mono", monospace;
   color-scheme: dark;
 }
 
@@ -18,7 +20,8 @@ html, body {
   height: 100%;
   background: #080706;
   color: var(--cream);
-  font-family: "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   overscroll-behavior: none;
   touch-action: manipulation;
   -webkit-user-select: none;
@@ -87,7 +90,7 @@ button { font: inherit; color: inherit; }
   background: linear-gradient(180deg, #050505, #1b1b1b);
   border: 1px solid #000;
   box-shadow: inset 0 2px 5px #000, 0 1px 0 rgba(255, 255, 255, 0.85), 0 0 0 1px rgba(0, 0, 0, 0.25);
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--mono);
 }
 .counter::after { /* скло над барабанами */
   content: "";
@@ -119,7 +122,7 @@ button { font: inherit; color: inherit; }
   z-index: 1;
   font-size: 13px;
   font-weight: 800;
-  letter-spacing: 0.3em;
+  letter-spacing: 0.22em;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 .brand b { color: var(--red); }
@@ -171,8 +174,8 @@ button { font: inherit; color: inherit; }
   place-items: center;
   padding-left: 56px;
   font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
+  font-weight: 700;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: #3a3a37;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
@@ -246,13 +249,22 @@ button { font: inherit; color: inherit; }
 .chrome-btn svg { width: 24px; height: 24px; fill: #cfcac0; filter: drop-shadow(0 -1px 0 #000); }
 .chrome-btn span { font-size: 13px; font-weight: 800; color: #e8e2d4; text-shadow: 0 -1px 0 #000; letter-spacing: 0.02em; }
 .chrome-btn:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), inset 0 0 0 2px rgba(255, 255, 255, 0.35); }
-.chrome-btn.small { width: 38px; height: 38px; }
+.chrome-btn.small { width: 42px; height: 42px; }
 .chrome-btn.small::before { inset: 5px; }
-.chrome-btn.small::after { left: 8px; right: 8px; top: 6px; height: 11px; }
-.chrome-btn.small svg { width: 17px; height: 17px; }
+.chrome-btn.small::after { left: 9px; right: 9px; top: 6px; height: 12px; }
+.chrome-btn.small svg { width: 18px; height: 18px; }
 @keyframes spin { to { transform: rotate(-360deg); } }
 
-.plate-actions { position: relative; z-index: 1; display: flex; gap: 8px; }
+.plate-actions { position: relative; z-index: 1; display: flex; gap: 12px; }
+.act { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.act .cap {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #55554f;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+}
 
 .flash-btn[aria-pressed="true"]::before,
 .date-btn[aria-pressed="true"]::before {
@@ -362,7 +374,7 @@ button { font: inherit; color: inherit; }
   padding: 0 8px;
   border: 1px solid #000;
   border-radius: 999px;
-  font: 700 13px/1 -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font: 700 13px/1 var(--mono);
   color: #d9d4c8;
   text-shadow: 0 -1px 0 #000;
   background: linear-gradient(180deg, #5b5e63 0%, #3b3d41 50%, #2a2b2e 51%, #3a3c40 100%);
@@ -382,29 +394,29 @@ button { font: inherit; color: inherit; }
 .controls {
   width: min(100%, 500px);
   display: grid;
-  grid-template-columns: 0.78fr 0.5fr 1.5fr;
-  gap: 10px;
+  grid-template-columns: 1fr 0.66fr 1.2fr;
+  gap: 8px;
 }
 .well {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
   min-width: 0;
-  padding: 9px 10px;
+  padding: 8px 8px 9px;
   border-radius: 10px;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.28));
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.1);
 }
-.cam-well, .ev-well { flex-direction: column; align-items: stretch; gap: 6px; flex: 1; }
-.ev-well .engrave { letter-spacing: 0.08em; font-size: 9px; }
-.ev-well .drum-item { text-align: center; padding: 0; }
-.film-pick { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.ev-well .drum-item { padding: 0 2px; }
+.engrave { letter-spacing: 0.08em; font-size: 9px; }
 
 .engrave {
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
+  text-align: center;
   color: var(--engrave);
   text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.1);
 }
@@ -436,10 +448,11 @@ button { font: inherit; color: inherit; }
 .drum-item {
   height: var(--drum-item);
   line-height: var(--drum-item);
-  padding: 0 10px;
+  padding: 0 6px;
   text-align: center;
-  font-size: 12.5px;
-  font-weight: 700;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: #f3ead5;
   text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.8);
   white-space: nowrap;
@@ -474,59 +487,29 @@ button { font: inherit; color: inherit; }
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.02) 50%, rgba(255, 176, 46, 0.1));
 }
 
-/* касета: циліндр із кольоровою етикеткою */
-.canister {
-  --lbl-bg: #f2b705;
-  --lbl-fg: #a3161a;
-  position: relative;
-  flex: none;
-  width: 44px;
-  height: 62px;
-  border-radius: 6px;
-  background: linear-gradient(90deg, #2a2a28 0%, #d6d6d3 22%, #fff 34%, #9c9c99 58%, #3a3a38 100%);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(0, 0, 0, 0.5);
-}
-.canister .cap {
-  position: absolute;
-  left: -1px;
-  right: -1px;
-  height: 9px;
-  border-radius: 4px;
-  background: linear-gradient(90deg, #4b4b49, #efefec 30%, #8a8a87 70%, #3b3b39);
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
-}
-.canister .cap-top { top: -2px; }
-.canister .cap-bottom { bottom: -2px; }
-.can-label {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 11px;
-  bottom: 11px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.45) 0%, rgba(255, 255, 255, 0.28) 30%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.5) 100%), var(--lbl-bg);
-  color: var(--lbl-fg);
-  text-align: center;
-  line-height: 1.05;
-}
-.can-label b { font-size: 7.5px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; max-width: 100%; }
-.can-label span { margin-top: 2px; font-size: 11px; font-weight: 900; max-width: 100%; }
-
-.plate {
+.lcd {
   width: min(100%, 500px);
-  padding: 2px 6px;
-  text-align: center;
-  font-size: 11.5px;
-  line-height: 1.35;
-  color: var(--engrave);
-  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 5px;
+  padding: 8px 11px 9px;
+  border-radius: 8px;
+  border: 1px solid #000;
+  background: linear-gradient(180deg, #070a07 0%, #10150f 100%);
+  box-shadow: inset 0 2px 6px #000, 0 1px 0 rgba(255, 255, 255, 0.12);
 }
-.plate p { margin: 0; }
-.plate #film-info { color: #d8cfba; font-weight: 600; }
+.lcd-row {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.lcd-key { font-size: 8.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #6d7b60; }
+.lcd-val { min-width: 0; }
+.lcd-val b { display: block; font-weight: 700; color: var(--amber); text-shadow: 0 0 7px rgba(255, 176, 46, 0.45); }
+.lcd-val span { display: block; color: #98a587; }
 
 /* --- нижня панель: спалах, спуск, формат --- */
 .bottom {
@@ -713,24 +696,19 @@ button { font: inherit; color: inherit; }
 }
 .shutter span {
   position: relative;
-  width: 62px;
-  height: 62px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 30%, #ff8d70 0%, #e0452b 38%, #b02612 70%, #6e1408 100%);
-  box-shadow: inset 0 -4px 7px rgba(0, 0, 0, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.5), 0 2px 3px rgba(0, 0, 0, 0.7);
-  transition: transform 0.08s, box-shadow 0.08s;
+  /* знизу вгору: блік точеного металу, центральна шайба, кільцеві канавки, залиті червоною фарбою, між ними голий метал */
+  background:
+    conic-gradient(from 0deg, rgba(255, 255, 255, 0) 0deg, rgba(255, 255, 255, 0.6) 38deg, rgba(255, 255, 255, 0) 84deg, rgba(0, 0, 0, 0.38) 135deg, rgba(255, 255, 255, 0) 180deg, rgba(255, 255, 255, 0.6) 218deg, rgba(255, 255, 255, 0) 264deg, rgba(0, 0, 0, 0.38) 315deg, rgba(255, 255, 255, 0) 360deg),
+    radial-gradient(circle at 50% 50%, #f4f5f6 0 5px, #9a9da1 6px, #55585c 7px, transparent 7.5px),
+    repeating-radial-gradient(circle at 50% 50%, #d3200e 0 2.3px, #6a0e05 2.3px 2.9px, #c9ccd0 2.9px 5.5px, #8a8d92 5.5px 6px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), inset 0 0 0 3px rgba(40, 42, 46, 0.45), inset 0 -3px 5px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.75);
+  transition: transform 0.08s, box-shadow 0.08s, filter 0.08s;
 }
-.shutter span::after { /* глянцевий блік */
-  content: "";
-  position: absolute;
-  left: 11px;
-  right: 11px;
-  top: 5px;
-  height: 22px;
-  border-radius: 50% / 100% 100% 0 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.05));
-}
-.shutter:active span { transform: scale(0.94) translateY(2px); box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.5), 0 0 0 rgba(0, 0, 0, 0); }
+.shutter:active span { transform: scale(0.95) translateY(2px); filter: brightness(0.88); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35), inset 0 0 0 3px rgba(40, 42, 46, 0.55), 0 0 0 rgba(0, 0, 0, 0); }
+.shutter:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; }
 .shutter[aria-disabled="true"] { filter: grayscale(1) brightness(0.55); }
 
 /* --- готовий кадр: без рамок, лише тінь --- */
@@ -840,7 +818,13 @@ button { font: inherit; color: inherit; }
 }
 @media (max-height: 700px) {
   .finder { width: min(calc(100vw - 120px), 340px, calc((100dvh - 470px) * var(--ar))); }
-  .plate #cam-info { display: none; }
+  .lcd-row:nth-child(2) { display: none; }
   .shutter { width: 76px; height: 76px; }
   .shutter span { width: 54px; height: 54px; }
+}
+
+/* кнопки й важелі мають помітний фокус із клавіатури; анімації вимикаються, якщо користувач просить менше руху */
+.chrome-btn:focus-visible, .lens-btn:focus-visible, .thumb-btn:focus-visible, .ios-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
