@@ -388,19 +388,37 @@ async function openStream(lensId = state.lensId) {
   return navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, ...size }, audio: false });
 }
 
-async function startCamera({ quiet = false } = {}) {
+let lastStartError = null;
+
+/**
+ * quiet: нічого не показувати у видошукачі (перемикання об'єктива).
+ * keepOld: новий потік відкривається, поки старий ще працює (дозвіл на камеру лишається чинним, чорного кадру нема);
+ * якщо система так не вміє, старий потік зупиняється й відкриття повторюється.
+ */
+async function startCamera({ quiet = false, keepOld = false } = {}) {
   const token = ++startToken; // новіший запуск скасовує попередній
-  stopCamera();
+  lastStartError = null;
+  if (!keepOld) stopCamera();
   if (!quiet) showMsg('Запуск камери…', false); // при перемиканні об'єктива у видошукачі нічого не з'являється
   try {
-    const s = await openStream();
+    let s;
+    try {
+      s = await openStream();
+    } catch (err) {
+      if (!keepOld || token !== startToken) throw err;
+      stopCamera(); // iOS не відкриває другу камеру, поки тримається перша
+      await sleep(250);
+      s = await openStream();
+    }
     if (token !== startToken) {
       s.getTracks().forEach((t) => t.stop());
       return;
     }
+    const old = stream;
     stream = s;
     detectTorch();
     els.video.srcObject = s;
+    if (old && old !== s) old.getTracks().forEach((t) => t.stop());
     await els.video.play();
     if (token !== startToken) return;
     hideMsg();
@@ -409,7 +427,8 @@ async function startCamera({ quiet = false } = {}) {
   } catch (err) {
     if (token !== startToken) return;
     console.warn('Камера:', err);
-    showMsg(describeError(err), true);
+    lastStartError = err;
+    if (!quiet) showMsg(describeError(err), true);
   }
 }
 
@@ -441,14 +460,15 @@ function activeLensId() {
   if (demoMode) return state.lensId || 'demo-wide';
   const id = settings.deviceId;
   if (id && lenses.some((l) => l.id === id)) return id;
-  return state.lensId && lenses.some((l) => l.id === state.lensId) ? state.lensId : mainLens() && mainLens().id;
+  // потік відкрито за facingMode (віртуальна камера): його deviceId не в списку, тож жодна кнопка не «справжня»
+  return !id && state.lensId && lenses.some((l) => l.id === state.lensId) ? state.lensId : '';
 }
 
 function renderLenses() {
   const picker = els.lensPicker;
   picker.hidden = lenses.length < 2;
   if (picker.hidden) return;
-  const active = activeLensId();
+  const active = activeLensId() || (mainLens() && mainLens().id);
   picker.replaceChildren(
     ...lenses.map((lens) => {
       const b = document.createElement('button');
@@ -495,22 +515,23 @@ async function selectLens(lens) {
   if (lensBusy || state.busy || lens.id === activeLensId()) return;
   lensBusy = true;
   haptic('tick');
-  const wasMain = activeLensId() === (mainLens() && mainLens().id);
+  const main = mainLens();
+  const wasMain = main && (activeLensId() || main.id) === main.id;
   // кадр основної камери беремо до перемикання: він потрібен, щоб виміряти збільшення телеоб'єктива
   const before = wasMain && lens.kind === 'tele' && !state.zoomByLens[lens.id] && els.video.videoWidth ? grabGray() : null;
   renderLenses();
   const prev = state.lensId;
-  state.lensId = lens.id === (mainLens() && mainLens().id) ? '' : lens.id;
+  state.lensId = lens.id; // 1× теж відкривається за точним deviceId: це справді основний об'єктив, а не автовибір
   try {
-    await startCamera({ quiet: true });
-    if (!stream && prev !== state.lensId) throw new Error('lens');
+    await startCamera({ quiet: true, keepOld: true });
+    if (!stream || activeLensId() !== lens.id) throw lastStartError || new Error('lens');
     if (before) await measureTele(lens, before);
     writeStore();
   } catch (err) {
     console.warn('Модуль камери:', err);
     state.lensId = prev;
-    toast('Не вдалося перемкнути об\'єктив');
-    await startCamera({ quiet: true });
+    toast(`Не вдалося перемкнути об'єктив${err && err.name ? ` (${err.name})` : ''}`, 3600);
+    if (!stream || !cameraAlive()) await startCamera({ quiet: true });
   } finally {
     lensBusy = false;
     renderLenses();

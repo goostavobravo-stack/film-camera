@@ -7,11 +7,13 @@ const ORDER = { ultra: 0, wide: 1, virtual: 2, tele: 3, other: 4 };
 /** Визначає тип об'єктива за підписом пристрою. */
 export function describeLens(label, index = 0) {
   const l = String(label || '').toLowerCase();
-  if (/front|user|selfie|facetime/.test(l)) return { kind: 'front', short: 'Селфі', name: 'Фронтальна камера' };
-  if (/dual|triple|quad/.test(l)) return { kind: 'virtual', short: 'Авто', name: 'Автовибір об\'єктива' };
-  if (/ultra/.test(l)) return { kind: 'ultra', short: '0.5×', name: 'Надширококутний' };
-  if (/tele/.test(l)) return { kind: 'tele', short: 'Тел.', name: 'Телеоб\'єктив' };
-  if (/back|rear|environment|wide/.test(l)) return { kind: 'wide', short: '1×', name: 'Основний' };
+  // iOS віддає підписи мовою системи («Задня камера», «Задня надширококутна камера»), тож крім англійських слів
+  // знаємо українські, російські й коренi поширених європейських мов
+  if (/front|user|selfie|facetime|передн|фронт|селфі|фронталь|avant|frontal|vorder|anteriore/.test(l)) return { kind: 'front', short: 'Селфі', name: 'Фронтальна камера' };
+  if (/dual|triple|quad|подвійн|потрійн|двойн|тройн/.test(l)) return { kind: 'virtual', short: 'Авто', name: 'Автовибір об\'єктива' };
+  if (/ultra|надширок|сверхширок|ультра|ultra-?wide|超广角|超廣角|超広角/.test(l)) return { kind: 'ultra', short: '0.5×', name: 'Надширококутний' };
+  if (/tele|телефото|телеоб|长焦|望遠|望远/.test(l)) return { kind: 'tele', short: 'Тел.', name: 'Телеоб\'єктив' };
+  if (/back|rear|environment|wide|задн|зад\b|широк|arrière|traseira|trasera|posteriore|rück|后置|後置|背面/.test(l)) return { kind: 'wide', short: '1×', name: 'Основний' };
   return { kind: 'other', short: String(index + 1), name: `Об'єктив ${index + 1}` };
 }
 

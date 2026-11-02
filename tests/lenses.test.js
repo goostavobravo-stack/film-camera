@@ -51,3 +51,14 @@ test('buildLensList: кілька однаково підписаних задн
   assert.equal(list.length, 3);
   assert.equal(list[0].id, 'a');
 });
+
+test('describeLens: підписи iOS українською та російською', () => {
+  assert.equal(describeLens('Задня камера').kind, 'wide');
+  assert.equal(describeLens('Задня надширококутна камера').kind, 'ultra');
+  assert.equal(describeLens('Задня телефото камера').kind, 'tele');
+  assert.equal(describeLens('Передня камера').kind, 'front');
+  assert.equal(describeLens('Задняя сверхширокоугольная камера').kind, 'ultra');
+  assert.equal(describeLens('Задняя телефотокамера').kind, 'tele');
+  assert.equal(describeLens('Задняя камера').kind, 'wide');
+  assert.equal(describeLens('Задня потрійна камера').kind, 'virtual');
+});
