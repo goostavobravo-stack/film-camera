@@ -7,7 +7,8 @@ import { createLever } from './lever.js';
 import { haptic } from './haptics.js';
 import { buildLensList } from './lenses.js';
 import { MIN_CONFIDENCE, estimateZoom, guessTeleFactor, zoomLabel } from './zoom.js';
-import { clearShots, deleteShot, loadShots, saveShot } from './store.js';
+import { clearShots, darkStore, deleteShot, loadShots, saveShot } from './store.js';
+import { createLab } from './darkroom.js';
 
 const MAX_FRAMES = 36;
 const STORE_KEY = 'film-camera-v1';
@@ -34,6 +35,9 @@ const els = {
   filmDrum: $('film-drum'),
   evDrum: $('ev-drum'),
   lensPicker: $('lens-picker'),
+  camera: $('camera'),
+  modeBtn: $('mode-btn'),
+  rewindLabel: document.querySelector('#rewind .lever-label'),
   filmInfo: $('film-info'),
   camInfo: $('cam-info'),
   flashBtn: $('flash-btn'),
@@ -101,12 +105,31 @@ function writeStore() {
       ev: state.ev,
       lens: state.lensId,
       zoom: state.zoomByLens,
+      mode: state.mode,
+      drPhase: dr.phase,
+      drEnd: dr.endReason,
+      drCount: dr.count,
     }));
   } catch { /* приватний режим: працюємо без збереження */ }
 }
 
+const PHASES = ['shooting', 'exposed', 'develop', 'negatives', 'positives'];
+
 const saved = readStore();
+/**
+ * Режим «Темна кімната»: окрема плівка зі своїм лічильником. Кадри не видно, доки плівку не проявлено трусінням.
+ * phase: shooting → exposed → develop → negatives → positives
+ * roll: { id, n, name, positive, thumbPos, thumbNeg, caption, bw, converted, time }
+ */
+const dr = {
+  phase: PHASES.includes(saved.drPhase) ? saved.drPhase : 'shooting',
+  endReason: saved.drEnd === 'full' ? 'full' : 'cut',
+  count: Number.isInteger(saved.drCount) ? Math.min(Math.max(saved.drCount, 0), 36) : 0,
+  maxFrames: 36,
+  roll: [],
+};
 const state = {
+  mode: saved.mode === 'darkroom' ? 'darkroom' : 'normal',
   cameraId: CAMERAS.some((c) => c.id === saved.camera) ? saved.camera : 'leica',
   filmId: FILMS.some((f) => f.id === saved.film) ? saved.film : 'kodak-gold-200',
   aspect: saved.aspect === '1:1' ? '1:1' : '3:2',
@@ -139,13 +162,19 @@ function toast(text, ms = 2400) {
   toastTimer = setTimeout(() => els.toast.classList.remove('show'), ms);
 }
 
+/** Лічильник активної плівки: звичайної чи темної кімнати. */
+const activeCount = () => (state.mode === 'darkroom' ? dr.count : state.count);
+/** Камері потрібен потік, окрім часу, коли йде проявка в темній кімнаті. */
+const needCamera = () => !(state.mode === 'darkroom' && dr.phase !== 'shooting');
+
 function renderCounter() {
-  const s = String(state.count).padStart(2, '0');
+  const count = activeCount();
+  const s = String(count).padStart(2, '0');
   els.wheelTens.textContent = s[0];
   els.wheelOnes.textContent = s[1];
-  els.counter.classList.toggle('end', state.count >= MAX_FRAMES);
-  els.counter.setAttribute('aria-label', `Знято кадрів: ${state.count} з ${MAX_FRAMES}`);
-  els.shutter.setAttribute('aria-disabled', String(state.count >= MAX_FRAMES));
+  els.counter.classList.toggle('end', count >= MAX_FRAMES);
+  els.counter.setAttribute('aria-label', `Знято кадрів: ${count} з ${MAX_FRAMES}`);
+  els.shutter.setAttribute('aria-disabled', String(count >= MAX_FRAMES));
 }
 
 function renderSelection() {
@@ -251,7 +280,7 @@ function rewindAll() {
   if (!cameraAlive()) recoverCamera();
 }
 
-createLever(els.rewind, { onComplete: rewindAll });
+createLever(els.rewind, { onComplete: () => (state.mode === 'darkroom' ? cutRoll() : rewindAll()) });
 
 // --- камера -------------------------------------------------------------------
 
@@ -596,7 +625,7 @@ els.video.addEventListener('resize', updateFinder);
 // Потік не зупиняємо, коли сторінка ховається (листок «Поділитися», перемикання застосунків):
 // новий getUserMedia змушує iOS питати дозвіл знову. Перезапуск лише якщо систему вбила потік.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden || !pipeline.supported) return;
+  if (document.hidden || !pipeline.supported || !needCamera()) return;
   const track = videoTrack();
   if (!track || track.readyState !== 'live') startCamera();
   else if (els.video.paused) els.video.play().catch(() => {});
@@ -668,8 +697,8 @@ function stamp(d) {
 }
 
 async function shoot() {
-  if (state.busy) return;
-  if (state.count >= MAX_FRAMES) return toast('Плівка закінчилась');
+  if (state.busy || (state.mode === 'darkroom' && dr.phase !== 'shooting')) return;
+  if (activeCount() >= MAX_FRAMES) return toast('Плівка закінчилась');
   if (!pipeline.supported) return toast('WebGL недоступний на цьому пристрої');
   if (!els.video.videoWidth) return toast('Камера ще не готова');
 
@@ -727,6 +756,34 @@ async function shoot() {
     pipeline.render(offscreen, params);
     const blob = await pipeline.toBlob('image/jpeg', 0.92);
     const thumb = await makeThumb(els.out);
+
+    if (state.mode === 'darkroom') {
+      // кадр не показуємо: він «ще на плівці» й з'явиться лише після проявки
+      dr.count += 1;
+      const n = dr.count;
+      const notes = frame.events.map((e) => EVENT_NAMES[e]).filter(Boolean);
+      console.log(`[кадр ${n}, темна кімната] ${camera.id} + ${dev.film.id}`, frame, dev.info || '');
+      addLatent({
+        id: `${Date.now()}-${n}`,
+        n,
+        name: `film-${stamp(new Date())}-${String(n).padStart(2, '0')}.jpg`,
+        positive: blob,
+        thumbPos: thumb,
+        thumbNeg: null,
+        caption:
+          `Кадр ${n} з ${MAX_FRAMES} · ${camera.name} · ${film.name}` +
+          (dev.info ? ` (${dev.info.text})` : '') +
+          (notes.length ? ` · ${notes.join(', ')}` : ''),
+        bw: dev.film.saturation === 0,
+        converted: false,
+        time: Date.now(),
+      });
+      writeStore();
+      renderCounter();
+      toast(`Кадр ${n} на плівці`, 900);
+      if (dr.count >= MAX_FRAMES) endRoll('full');
+      return;
+    }
 
     state.count += 1;
     const n = state.count;
@@ -799,6 +856,92 @@ async function deliver(items) {
   if (items.length > 1) toast(`Завантажено файлів: ${items.length}`);
 }
 
+// --- режим «Темна кімната» -------------------------------------------------------
+
+/** Камера працює лише на етапі зйомки. На час проявки потік тільки вимикається (без нового запиту дозволу). */
+function setCameraActive(on) {
+  const track = videoTrack();
+  if (on) {
+    if (!track || track.readyState !== 'live') startCamera();
+    else {
+      track.enabled = true;
+      els.video.play().catch(() => {});
+      if (!cameraAlive()) recoverCamera();
+    }
+  } else if (track) {
+    track.enabled = false;
+  }
+}
+
+function addLatent(frame) {
+  dr.roll.push(frame);
+  darkStore.saveShot(frame); // у фоні: якщо IndexedDB недоступний, кадр лишається лише в пам'яті
+  renderRollButton();
+}
+
+/** Змінює етап темної кімнати: показує або ховає її екран і запам'ятовує вибір. */
+function setPhase(phase) {
+  dr.phase = phase;
+  writeStore();
+  renderCounter();
+  lab.render();
+}
+
+function endRoll(reason) {
+  dr.endReason = reason;
+  setCameraActive(false);
+  toast(reason === 'full' ? 'Плівка закінчилась: час проявляти' : 'Плівку відрізано: час проявляти', 2600);
+  setPhase('exposed');
+}
+
+/** Відрізання: ручку важеля протягнуто до кінця. Діалогу підтвердження немає (він ще й зупиняє відео на iOS). */
+function cutRoll() {
+  if (dr.phase !== 'shooting') return;
+  if (dr.roll.length === 0) return toast('Спершу зніміть хоча б один кадр');
+  endRoll('cut');
+}
+
+async function clearDark() {
+  dr.roll = [];
+  await darkStore.clearShots();
+}
+
+function startNewRoll() {
+  dr.count = 0;
+  dr.roll = [];
+  renderRollButton();
+  setPhase('shooting');
+  setCameraActive(true);
+  toast('Нова плівка заряджена');
+}
+
+/** Показує вибраний режим: підпис важеля, лічильник, кнопку біля спуску, екран темної кімнати. */
+function renderMode() {
+  const dark = state.mode === 'darkroom';
+  els.camera.dataset.mode = state.mode;
+  els.modeBtn.setAttribute('aria-pressed', String(dark));
+  els.rewindLabel.textContent = dark ? 'відрізати плівку' : 'перемотати плівку';
+  els.rewind.setAttribute('aria-label', dark ? 'Відрізати плівку: протягніть вправо' : 'Перемотати плівку: протягніть вправо');
+  renderCounter();
+  renderRollButton();
+  lab.render();
+}
+
+els.modeBtn.addEventListener('click', () => {
+  if (state.busy) return;
+  state.mode = state.mode === 'darkroom' ? 'normal' : 'darkroom';
+  writeStore();
+  renderMode();
+  if (needCamera()) setCameraActive(true);
+  else setCameraActive(false);
+  toast(
+    state.mode === 'darkroom'
+      ? 'Темна кімната: кадрів не видно, доки не проявите плівку'
+      : 'Звичайний режим: кадр видно одразу',
+    2800,
+  );
+});
+
 const saveLast = () => (state.last ? deliver([state.last]) : undefined);
 
 els.save.addEventListener('click', saveLast);
@@ -828,6 +971,16 @@ function forgetUrls(id) {
 
 /** Мініатюра останнього кадру з лічильником на кнопці камери. */
 function renderRollButton() {
+  if (state.mode === 'darkroom') {
+    // мініатюра не показує знятого: лише кількість кадрів на невиявленій плівці
+    const n = dr.roll.length;
+    els.galleryBtn.classList.add('empty');
+    els.galleryThumb.style.backgroundImage = '';
+    els.galleryBadge.hidden = n === 0;
+    els.galleryBadge.textContent = String(n);
+    els.galleryBtn.setAttribute('aria-label', n ? `Плівка в камері: ${n} кадрів` : 'Плівка в камері');
+    return;
+  }
   const last = state.roll[state.roll.length - 1];
   els.galleryBtn.classList.toggle('empty', !last);
   els.galleryThumb.style.backgroundImage = last ? `url("${thumbUrl(last)}")` : '';
@@ -1020,6 +1173,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 els.galleryBtn.addEventListener('click', () => {
+  if (state.mode === 'darkroom') return lab.openLatent();
   renderGallery();
   els.gallery.hidden = false;
 });
@@ -1047,10 +1201,29 @@ els.viewerDelete.addEventListener('click', () => {
   }
 });
 
+const lab = createLab({
+  state: dr,
+  isActive: () => state.mode === 'darkroom',
+  setPhase,
+  saveFrame: darkStore.saveShot,
+  clearAll: clearDark,
+  onNewRoll: startNewRoll,
+  toast,
+  deliver,
+});
+
 loadShots().then((shots) => {
   if (!shots.length) return;
   state.roll = shots;
   renderRollButton();
+});
+darkStore.loadShots().then((shots) => {
+  // сховище відповідає із запізненням: не затираємо кадри, зняті за цей час
+  const have = new Set(dr.roll.map((f) => f.id));
+  dr.roll = [...shots.filter((x) => !have.has(x.id)), ...dr.roll].sort((a, b) => a.time - b.time);
+  if (dr.phase === 'shooting' && shots.length >= MAX_FRAMES) dr.phase = 'exposed';
+  renderRollButton();
+  lab.render();
 });
 
 // --- старт --------------------------------------------------------------------
@@ -1060,8 +1233,9 @@ renderSelection();
 renderFlash();
 renderDate();
 renderAspect();
+renderMode();
 if (!pipeline.supported) {
   showMsg('Цей браузер не підтримує WebGL, тож проявити кадр неможливо.', false);
-} else {
+} else if (needCamera()) {
   startCamera();
 }

@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main class="camera">
+  <main class="camera" id="camera">
     <header class="top-plate">
       <span class="screw s1" aria-hidden="true"></span>
       <span class="screw s2" aria-hidden="true"></span>
@@ -39,9 +39,13 @@
           </button>
             <span class="cap">Дата</span>
           </div>
+          <div class="act">
+            <button class="chrome-btn small mode-btn" id="mode-btn" type="button" aria-pressed="false" aria-label="Режим «Темна кімната»">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C9.4 6.2 6 9.6 6 14a6 6 0 0 0 12 0c0-4.4-3.4-7.8-6-11.5zm-2.6 11.4a1 1 0 0 1 2 0 2.7 2.7 0 0 0 2.7 2.7 1 1 0 0 1 0 2A4.7 4.7 0 0 1 9.4 13.9z"/></svg>
+            </button>
+            <span class="cap">Кімната</span>
+          </div>
         </div>
-
-        <div class="brand" aria-hidden="true">ПЛІВКА <b>36</b></div>
       </div>
 
       <!-- важіль перемотки: протягніть ручку зліва направо -->
@@ -143,6 +147,82 @@
       <button type="button" id="viewer-back" class="ios-btn">Назад</button>
       <button type="button" id="viewer-delete" class="ios-btn red">Видалити</button>
       <button type="button" id="viewer-save" class="ios-btn blue">Зберегти</button>
+    </div>
+  </section>
+
+  <!-- невиявлені кадри: що вже знято, але ще не видно -->
+  <section class="latent lab-theme" id="latent" hidden aria-label="Плівка в камері">
+    <header class="nav-bar"><h2 id="latent-title">Плівка в камері</h2></header>
+    <div class="gallery-scroll">
+      <div class="gallery-grid" id="latent-grid"></div>
+      <p class="gallery-empty" id="latent-empty">Поки що жодного кадру. Знімайте: кадри з'являться тут, але побачите ви їх лише після проявки плівки.</p>
+    </div>
+    <div class="print-bar">
+      <button type="button" id="latent-close" class="ios-btn">Закрити</button>
+    </div>
+  </section>
+
+  <!-- темна кімната -->
+  <main class="lab lab-theme" id="lab" hidden>
+    <header class="nav-bar"><h2 id="lab-title">Темна кімната</h2></header>
+
+    <div class="lab-body">
+      <section class="lab-view" id="lab-exposed" hidden>
+        <div class="roll-can" aria-hidden="true"><i></i><i></i></div>
+        <h3 id="exposed-title">Плівку знято</h3>
+        <p id="exposed-text"></p>
+      </section>
+
+      <section class="lab-view" id="lab-develop" hidden>
+        <div class="jar" id="jar" aria-label="Баночка для проявки">
+          <div class="jar-lid"></div>
+          <div class="jar-glass">
+            <div class="liquid"></div>
+            <div class="reel"></div>
+          </div>
+        </div>
+        <div class="gauge" role="progressbar" aria-label="Проявка">
+          <div class="gauge-fill" id="gauge-fill"></div>
+          <span id="gauge-pct">0%</span>
+        </div>
+        <p class="stage" id="stage-name">Баночка з проявником</p>
+        <p class="lab-hint" id="develop-hint"></p>
+        <button class="ios-btn blue wide" id="shake-start" type="button">Почати проявку</button>
+      </section>
+
+      <section class="lab-view" id="lab-negatives" hidden>
+        <p class="lab-note">Це негативи: плівка помаранчева, світле стало темним, кольори інвертовані. Щоб побачити фото, переведіть їх у позитив.</p>
+        <div class="strips" id="neg-strips"></div>
+      </section>
+
+      <section class="lab-view" id="lab-positives" hidden>
+        <div class="gallery-grid" id="pos-grid"></div>
+      </section>
+    </div>
+
+    <div class="print-bar" id="lab-bar">
+      <button type="button" id="lab-btn-develop" class="ios-btn blue">Проявити</button>
+      <button type="button" id="lab-btn-convert" class="ios-btn blue" hidden>Перевести в позитив</button>
+      <button type="button" id="lab-btn-newroll" class="ios-btn" hidden>Нова плівка</button>
+      <button type="button" id="lab-btn-saveall" class="ios-btn blue" hidden>Зберегти все</button>
+    </div>
+  </main>
+
+  <section class="viewer" id="lab-viewer" hidden aria-label="Кадр">
+    <div class="viewer-stage" id="lab-viewer-stage">
+      <div class="viewer-track" id="lab-viewer-track">
+        <div class="slide"><img alt=""></div>
+        <div class="slide"><img alt=""></div>
+        <div class="slide"><img alt=""></div>
+      </div>
+      <button type="button" class="viewer-nav prev" id="lab-viewer-prev" aria-label="Новіший кадр">‹</button>
+      <button type="button" class="viewer-nav next" id="lab-viewer-next" aria-label="Старіший кадр">›</button>
+    </div>
+    <p class="viewer-pos" id="lab-viewer-pos"></p>
+    <p class="print-caption" id="lab-viewer-caption"></p>
+    <div class="print-bar">
+      <button type="button" id="lab-viewer-back" class="ios-btn">Назад</button>
+      <button type="button" id="lab-viewer-save" class="ios-btn blue">Зберегти</button>
     </div>
   </section>
 

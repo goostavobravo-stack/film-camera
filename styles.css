@@ -128,7 +128,7 @@ button { font: inherit; color: inherit; }
 .brand b { color: var(--red); }
 
 .plate-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; }
-.plate-row .brand { margin-left: auto; }
+.plate-row .plate-actions { margin-left: auto; }
 
 /* --- важіль перемотки: протягніть ручку зліва направо --- */
 .lever {
@@ -267,12 +267,14 @@ button { font: inherit; color: inherit; }
 }
 
 .flash-btn[aria-pressed="true"]::before,
-.date-btn[aria-pressed="true"]::before {
+.date-btn[aria-pressed="true"]::before,
+.mode-btn[aria-pressed="true"]::before {
   background: radial-gradient(circle at 50% 40%, #ffe29a, #ffb02e 55%, #b26a00);
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.7), inset 0 -2px 4px rgba(120, 60, 0, 0.7), 0 0 14px 3px rgba(255, 176, 46, 0.6);
 }
 .flash-btn[aria-pressed="true"] svg,
-.date-btn[aria-pressed="true"] svg { fill: #fff7dc; filter: drop-shadow(0 0 4px #fff) drop-shadow(0 -1px 0 #b26a00); }
+.date-btn[aria-pressed="true"] svg,
+.mode-btn[aria-pressed="true"] svg { fill: #fff7dc; filter: drop-shadow(0 0 4px #fff) drop-shadow(0 -1px 0 #b26a00); }
 
 /* --- видошукач: хромова рамка і скло --- */
 .body {
@@ -827,4 +829,202 @@ button { font: inherit; color: inherit; }
 .chrome-btn:focus-visible, .lens-btn:focus-visible, .thumb-btn:focus-visible, .ios-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* ===== темна кімната ===== */
+.camera[hidden], .latent[hidden], .lab[hidden] { display: none; }
+.latent, .lab { position: fixed; inset: 0; z-index: 12; display: flex; flex-direction: column; }
+
+.lab-theme {
+  background: radial-gradient(120% 70% at 50% 15%, #4a110b 0%, #1c0504 55%, #0b0202 100%);
+  color: #ffcfa0;
+}
+.lab-theme .nav-bar {
+  background: linear-gradient(180deg, #5f1c13 0%, #3a110c 50%, #260a07 51%, #130403 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 190, 140, 0.3), 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+.lab-theme .gallery-empty { color: #d9a477; }
+.lab-theme .print-bar {
+  background: linear-gradient(180deg, #4d1810 0%, #2f0e09 50%, #1d0806 51%, #0f0302 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 190, 140, 0.3);
+}
+
+.lab-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.lab-view {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 22px 16px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+.lab-view[hidden] { display: none; }
+.lab-view h3 { margin: 0; font-size: 21px; text-shadow: 0 -1px 0 #000; }
+.lab-view p { margin: 0; max-width: 36ch; font-size: 15px; line-height: 1.5; color: #e9b88a; }
+.lab-note { font-size: 14px !important; }
+.lab-hint { min-height: 3em; }
+
+.roll-can {
+  position: relative;
+  width: 84px;
+  height: 116px;
+  margin: 26px 0 10px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #222, #d8d8d4 24%, #fff 36%, #9a9a96 60%, #2d2d2b);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.85);
+}
+.roll-can::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 26px;
+  bottom: 26px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.45), rgba(255, 255, 255, 0.25) 35%, rgba(0, 0, 0, 0.05) 60%, rgba(0, 0, 0, 0.5)), #f2b705;
+}
+.roll-can i {
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  height: 16px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #444, #f0f0ec 30%, #8a8a86 70%, #333);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+.roll-can i:first-child { top: -5px; }
+.roll-can i:last-child { bottom: -5px; }
+
+/* баночка для проявки */
+.jar { --slosh: 0; width: 150px; margin-top: 8px; transform-origin: 50% 100%; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.jar-lid {
+  width: 118px;
+  height: 30px;
+  margin: 0 auto;
+  border-radius: 8px 8px 3px 3px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.25) 0 2px, transparent 2px 5px),
+    linear-gradient(90deg, #3d3d3b, #efefeb 30%, #8c8c88 68%, #2f2f2d);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.7);
+}
+.jar-glass {
+  position: relative;
+  height: 220px;
+  margin-top: -2px;
+  border-radius: 12px 12px 26px 26px;
+  border: 2px solid rgba(255, 230, 200, 0.35);
+  overflow: hidden;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.03) 30%, rgba(255, 255, 255, 0.08) 68%, rgba(255, 255, 255, 0.22));
+  box-shadow: inset 0 0 22px rgba(255, 255, 255, 0.1), 0 14px 26px rgba(0, 0, 0, 0.65);
+}
+.liquid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 66%;
+  background: linear-gradient(180deg, rgba(204, 118, 34, 0.88), rgba(116, 54, 8, 0.95));
+}
+.liquid::before {
+  content: "";
+  position: absolute;
+  left: -25%;
+  right: -25%;
+  top: -9px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(214, 128, 40, 0.92);
+  animation: wave calc(1.8s - var(--slosh) * 1.4s) ease-in-out infinite alternate;
+}
+@keyframes wave {
+  from { transform: translateX(calc(var(--slosh) * -14%)) rotate(-2deg); }
+  to { transform: translateX(calc(var(--slosh) * 14%)) rotate(2deg); }
+}
+.reel {
+  position: absolute;
+  left: 50%;
+  top: 16px;
+  bottom: 16px;
+  width: 34px;
+  margin-left: -17px;
+  border-radius: 6px;
+  background: repeating-linear-gradient(180deg, #2a1e16 0 6px, #4a3626 6px 9px);
+  opacity: 0.85;
+  box-shadow: 0 0 0 5px rgba(20, 10, 5, 0.35);
+}
+
+.gauge {
+  position: relative;
+  width: min(86%, 320px);
+  height: 22px;
+  border-radius: 11px;
+  border: 1px solid #000;
+  background: #1a0705;
+  box-shadow: inset 0 2px 5px #000, 0 1px 0 rgba(255, 200, 150, 0.15);
+  overflow: hidden;
+}
+.gauge-fill { height: 100%; width: 0; background: linear-gradient(180deg, #ffb257, #d86a10); transition: width 0.12s linear; }
+.gauge span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; }
+.stage { font-size: 19px; font-weight: 800; color: #ffd08a; text-shadow: 0 -1px 0 #000; }
+.ios-btn.wide { flex: none; width: min(100%, 280px); max-width: none; height: 46px; }
+
+/* смужки негативів */
+.strips { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.strip {
+  position: relative;
+  width: min(100%, 520px);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 22px 10px;
+  border-radius: 3px;
+  background: #17100c;
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.75), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+.strip::before, .strip::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 9px;
+  opacity: 0.9;
+  background: repeating-linear-gradient(90deg, transparent 0 6px, #e6d8b8 6px 15px, transparent 15px 22px);
+}
+.strip::before { top: 6px; }
+.strip::after { bottom: 6px; }
+.neg-frame { position: relative; aspect-ratio: 1; padding: 0; border: 0; background: #5d3217; overflow: hidden; }
+.neg-frame:empty { background: transparent; }
+.neg-frame img { display: block; width: 100%; height: 100%; object-fit: contain; transition: filter 0.65s ease; }
+.neg-frame img.inverting { filter: invert(1) hue-rotate(180deg) brightness(1.1) contrast(1.1); }
+.keycode {
+  position: absolute;
+  left: 4px;
+  bottom: 2px;
+  font: 700 10px var(--mono);
+  color: #ff9a3d;
+  text-shadow: 0 0 4px rgba(255, 120, 20, 0.7);
+}
+
+/* невиявлені кадри */
+.tile {
+  aspect-ratio: 1;
+  border: 0;
+  display: grid;
+  place-items: center;
+  font: 800 20px var(--mono);
+  color: #ff9a3d;
+  text-shadow: 0 0 8px rgba(255, 120, 20, 0.6);
+  background: radial-gradient(circle at 50% 50%, #1b0d09, #0a0403);
+  box-shadow: inset 0 0 0 1px rgba(255, 150, 60, 0.15);
+  cursor: pointer;
+}
+
+/* мініатюра біля спуску не показує знятого: лише кадр плівки в темряві */
+.camera[data-mode="darkroom"] .thumb-btn .thumb-img {
+  background:
+    linear-gradient(#ff9a3d, #ff9a3d) 50% 50% / 38% 3px no-repeat,
+    repeating-linear-gradient(90deg, transparent 0 4px, #cbb98f 4px 8px, transparent 8px 12px) 0 3px / 100% 4px no-repeat,
+    repeating-linear-gradient(90deg, transparent 0 4px, #cbb98f 4px 8px, transparent 8px 12px) 0 calc(100% - 3px) / 100% 4px no-repeat,
+    #120b08;
 }
