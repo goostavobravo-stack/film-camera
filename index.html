@@ -56,10 +56,18 @@
         </div>
       </div>
 
+      <!-- модулі камери: 0.5× / 1× / телеоб'єктив; з'являється, лише якщо в телефона їх кілька -->
+      <div class="lens-picker" id="lens-picker" role="group" aria-label="Модуль камери" hidden></div>
+
       <div class="controls" id="controls">
         <div class="well cam-well">
           <span class="engrave">Камера</span>
           <div class="drum" id="camera-drum"></div>
+        </div>
+
+        <div class="well ev-well">
+          <span class="engrave">Експоз.</span>
+          <div class="drum" id="ev-drum"></div>
         </div>
 
         <div class="well film-well">

@@ -296,7 +296,7 @@ button { font: inherit; color: inherit; }
   --ar: 1.5;
   position: relative;
   aspect-ratio: var(--ar);
-  width: min(calc(100vw - 70px), 460px, calc((100dvh - 470px) * var(--ar)));
+  width: min(calc(100vw - 120px), 340px, calc((100dvh - 520px) * var(--ar)));
   background: #000;
   border-radius: 10px;
   border: 6px solid #050505;
@@ -345,11 +345,44 @@ button { font: inherit; color: inherit; }
 }
 .finder-msg[hidden] { display: none; }
 
+/* --- модулі камери: 0.5× / 1× / телеоб'єктив --- */
+.lens-picker {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.28));
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.lens-picker[hidden] { display: none; }
+.lens-btn {
+  min-width: 44px;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid #000;
+  border-radius: 999px;
+  font: 700 13px/1 -apple-system, "Helvetica Neue", Arial, sans-serif;
+  color: #d9d4c8;
+  text-shadow: 0 -1px 0 #000;
+  background: linear-gradient(180deg, #5b5e63 0%, #3b3d41 50%, #2a2b2e 51%, #3a3c40 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 4px rgba(0, 0, 0, 0.7);
+  cursor: pointer;
+}
+.lens-btn:active { transform: translateY(1px); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8); }
+.lens-btn[aria-pressed="true"] {
+  color: #2a1700;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+  background: linear-gradient(180deg, #ffd27a 0%, var(--amber) 50%, #e08e12 51%, #f2a420 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 0 8px rgba(255, 176, 46, 0.5), 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+.lens-btn:disabled { opacity: 0.6; }
+
 /* --- вибір камери й плівки --- */
 .controls {
   width: min(100%, 500px);
   display: grid;
-  grid-template-columns: 0.78fr 1.6fr;
+  grid-template-columns: 0.78fr 0.5fr 1.5fr;
   gap: 10px;
 }
 .well {
@@ -362,7 +395,9 @@ button { font: inherit; color: inherit; }
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.28));
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.1);
 }
-.cam-well { flex-direction: column; align-items: stretch; gap: 6px; flex: 1; }
+.cam-well, .ev-well { flex-direction: column; align-items: stretch; gap: 6px; flex: 1; }
+.ev-well .engrave { letter-spacing: 0.08em; font-size: 9px; }
+.ev-well .drum-item { text-align: center; padding: 0; }
 .film-pick { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 
 .engrave {
@@ -800,11 +835,11 @@ button { font: inherit; color: inherit; }
 
 @media (max-width: 380px) {
   .brand { letter-spacing: 0.18em; }
-  .finder { width: min(calc(100vw - 70px), calc((100dvh - 520px) * var(--ar))); }
+  .finder { width: min(calc(100vw - 110px), calc((100dvh - 560px) * var(--ar))); }
   .drum-item { font-size: 12px; padding: 0 6px; }
 }
 @media (max-height: 700px) {
-  .finder { width: min(calc(100vw - 70px), 460px, calc((100dvh - 430px) * var(--ar))); }
+  .finder { width: min(calc(100vw - 120px), 340px, calc((100dvh - 470px) * var(--ar))); }
   .plate #cam-info { display: none; }
   .shutter { width: 76px; height: 76px; }
   .shutter span { width: 54px; height: 54px; }

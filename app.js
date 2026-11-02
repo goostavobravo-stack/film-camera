@@ -5,10 +5,17 @@ import { NEUTRAL_FRAME, newSeed, rollFrame } from './random.js';
 import { createDrum } from './drum.js';
 import { createLever } from './lever.js';
 import { haptic } from './haptics.js';
+import { buildLensList } from './lenses.js';
+import { MIN_CONFIDENCE, estimateZoom, guessTeleFactor, zoomLabel } from './zoom.js';
 import { clearShots, deleteShot, loadShots, saveShot } from './store.js';
 
 const MAX_FRAMES = 36;
 const STORE_KEY = 'film-camera-v1';
+/** Поправка експозиції, як на камері: кроки по 1/3 EV. */
+const EV_STEPS = [
+  { id: -1, label: '−1' }, { id: -2 / 3, label: '−⅔' }, { id: -1 / 3, label: '−⅓' }, { id: 0, label: '0' },
+  { id: 1 / 3, label: '+⅓' }, { id: 2 / 3, label: '+⅔' }, { id: 1, label: '+1' },
+];
 const TORCH_WARMUP_MS = 450;
 const demoMode = new URLSearchParams(location.search).has('demo');
 
@@ -25,6 +32,8 @@ const els = {
   rewind: $('rewind'),
   cameraDrum: $('camera-drum'),
   filmDrum: $('film-drum'),
+  evDrum: $('ev-drum'),
+  lensPicker: $('lens-picker'),
   canister: $('canister'),
   canisterBrand: $('canister-brand'),
   canisterName: $('canister-name'),
@@ -93,6 +102,9 @@ function writeStore() {
       count: state.count,
       flash: state.flash,
       date: state.date,
+      ev: state.ev,
+      lens: state.lensId,
+      zoom: state.zoomByLens,
     }));
   } catch { /* приватний режим: працюємо без збереження */ }
 }
@@ -105,6 +117,9 @@ const state = {
   count: Number.isInteger(saved.count) ? Math.min(Math.max(saved.count, 0), MAX_FRAMES) : 0,
   flash: saved.flash === true,
   date: saved.date !== false, // штамп дати за замовчуванням увімкнений
+  ev: EV_STEPS.some((s) => s.id === saved.ev) ? saved.ev : 0, // поправка експозиції, EV
+  lensId: typeof saved.lens === 'string' ? saved.lens : '', // вибраний модуль камери (deviceId), '' = основний
+  zoomByLens: saved.zoom && typeof saved.zoom === 'object' ? saved.zoom : {}, // виміряне збільшення телеоб'єктивів
   roll: [], // кадри поточної плівки (дублюються в IndexedDB): { id, n, name, blob, thumb, caption, time }
   torch: false, // чи вміє поточна камера вмикати ліхтарик (iOS Safari не вміє)
   busy: false,
@@ -192,6 +207,15 @@ const filmDrum = createDrum(els.filmDrum, FILMS.map((f) => ({ id: f.id, label: f
   },
 });
 
+const evDrum = createDrum(els.evDrum, EV_STEPS, {
+  index: Math.max(0, EV_STEPS.findIndex((s) => s.id === state.ev)),
+  label: 'Експозиція',
+  onChange: (item) => {
+    state.ev = item.id;
+    writeStore();
+  },
+});
+
 els.formatBtn.addEventListener('click', () => {
   state.aspect = state.aspect === '3:2' ? '1:1' : '3:2';
   writeStore();
@@ -259,7 +283,7 @@ function describeError(err) {
 }
 
 /** Тестова картинка для ?demo: дає змогу перевірити пайплайн без камери. */
-function createDemoStream() {
+function createDemoStream(zoom = 1) {
   const cv = document.createElement('canvas');
   cv.width = 1280;
   cv.height = 720;
@@ -267,6 +291,10 @@ function createDemoStream() {
   const draw = (t) => {
     const w = cv.width;
     const h = cv.height;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+    ctx.setTransform(zoom, 0, 0, zoom, (w / 2) * (1 - zoom), (h / 2) * (1 - zoom)); // «об'єктив»: збільшення від центра
     const sky = ctx.createLinearGradient(0, 0, 0, h * 0.65);
     sky.addColorStop(0, '#3b6fb5');
     sky.addColorStop(1, '#f3c98b');
@@ -332,21 +360,38 @@ async function setTorch(on) {
   }
 }
 
-function openStream() {
-  if (demoMode) return Promise.resolve(createDemoStream());
+// у демо-режимі (?demo=1) є три «об'єктиви»; збільшення телеоб'єктива задає ?tele=5
+const DEMO_TELE = Number(new URLSearchParams(location.search).get('tele')) || 3;
+const DEMO_DEVICES = [
+  { kind: 'videoinput', deviceId: 'demo-ultra', label: 'Back Ultra Wide Camera', zoom: 0.5 },
+  { kind: 'videoinput', deviceId: 'demo-wide', label: 'Back Camera', zoom: 1 },
+  { kind: 'videoinput', deviceId: 'demo-tele', label: 'Back Telephoto Camera', zoom: DEMO_TELE },
+];
+
+/** Відкриває потік вибраного модуля (lensId) або, якщо його нема чи він недоступний, основної задньої камери. */
+async function openStream(lensId = state.lensId) {
+  if (demoMode) return createDemoStream((DEMO_DEVICES.find((d) => d.deviceId === lensId) || DEMO_DEVICES[1]).zoom);
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    return Promise.reject(Object.assign(new Error('mediaDevices'), { name: 'NotSupportedError' }));
+    throw Object.assign(new Error('mediaDevices'), { name: 'NotSupportedError' });
   }
-  return navigator.mediaDevices.getUserMedia({
-    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-    audio: false,
-  });
+  const size = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+  if (lensId) {
+    try {
+      return await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: lensId }, ...size }, audio: false });
+    } catch (err) {
+      // пристрій зник (інший браузер, оновлення iOS): забуваємо його й відкриваємо основну камеру
+      if (!['OverconstrainedError', 'NotFoundError'].includes(err.name)) throw err;
+      state.lensId = '';
+      writeStore();
+    }
+  }
+  return navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, ...size }, audio: false });
 }
 
-async function startCamera() {
+async function startCamera({ quiet = false } = {}) {
   const token = ++startToken; // новіший запуск скасовує попередній
   stopCamera();
-  showMsg('Запуск камери…', false);
+  if (!quiet) showMsg('Запуск камери…', false); // при перемиканні об'єктива у видошукачі нічого не з'являється
   try {
     const s = await openStream();
     if (token !== startToken) {
@@ -360,6 +405,7 @@ async function startCamera() {
     if (token !== startToken) return;
     hideMsg();
     updateFinder();
+    refreshLenses();
   } catch (err) {
     if (token !== startToken) return;
     console.warn('Камера:', err);
@@ -376,6 +422,112 @@ function stopCamera() {
 // --- стійкість камери --------------------------------------------------------------
 // Систему може зупинити відео (діалог, перемикання застосунків, перерваний потік): тоді drawImage дає
 // той самий застиглий кадр. Перед кожним знімком і після перемотки перевіряємо, що кадри справді йдуть.
+
+// --- модулі камери (0.5× / 1× / телеоб'єктив) ---------------------------------
+
+let lenses = [];
+let lensBusy = false;
+
+const mainLens = () => lenses.find((l) => l.kind === 'wide') || lenses.find((l) => l.kind !== 'ultra' && l.kind !== 'tele') || lenses[0];
+/** Збільшення телеоб'єктива: виміряне, а поки не виміряно, припущення за екраном телефона. */
+const teleFactor = (lens) => state.zoomByLens[lens.id] || guessTeleFactor(screen.width, screen.height);
+function lensLabel(lens) {
+  if (lens.kind === 'tele') return zoomLabel(teleFactor(lens));
+  return lens.short;
+}
+/** Який модуль зараз у потоці: за deviceId треку, а якщо браузер його не каже, за вибором користувача. */
+function activeLensId() {
+  const settings = videoTrack() && videoTrack().getSettings ? videoTrack().getSettings() : {};
+  if (demoMode) return state.lensId || 'demo-wide';
+  const id = settings.deviceId;
+  if (id && lenses.some((l) => l.id === id)) return id;
+  return state.lensId && lenses.some((l) => l.id === state.lensId) ? state.lensId : mainLens() && mainLens().id;
+}
+
+function renderLenses() {
+  const picker = els.lensPicker;
+  picker.hidden = lenses.length < 2;
+  if (picker.hidden) return;
+  const active = activeLensId();
+  picker.replaceChildren(
+    ...lenses.map((lens) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lens-btn';
+      b.textContent = lensLabel(lens);
+      b.title = lens.kind === 'tele' ? `${lens.name} ${lensLabel(lens)}` : lens.name;
+      b.setAttribute('aria-label', b.title);
+      b.setAttribute('aria-pressed', String(lens.id === active));
+      b.disabled = lensBusy;
+      b.addEventListener('click', () => selectLens(lens));
+      return b;
+    }),
+  );
+}
+
+/** Перечитує список камер: підписи пристроїв браузер показує лише після дозволу, тож робимо це після старту потоку. */
+async function refreshLenses() {
+  try {
+    const devices = demoMode ? DEMO_DEVICES : await navigator.mediaDevices.enumerateDevices();
+    lenses = buildLensList(devices);
+  } catch {
+    lenses = [];
+  }
+  renderLenses();
+}
+
+/** Знімає зменшений сірий кадр поточного відео: для порівняння основної камери й телеоб'єктива. */
+function grabGray(size = 480) {
+  const w = size;
+  const h = Math.max(1, Math.round((size * els.video.videoHeight) / els.video.videoWidth));
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(els.video, 0, 0, w, h);
+  const px = ctx.getImageData(0, 0, w, h).data;
+  const gray = new Float32Array(w * h);
+  for (let i = 0; i < gray.length; i++) gray[i] = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
+  return { gray, w, h };
+}
+
+async function selectLens(lens) {
+  if (lensBusy || state.busy || lens.id === activeLensId()) return;
+  lensBusy = true;
+  haptic('tick');
+  const wasMain = activeLensId() === (mainLens() && mainLens().id);
+  // кадр основної камери беремо до перемикання: він потрібен, щоб виміряти збільшення телеоб'єктива
+  const before = wasMain && lens.kind === 'tele' && !state.zoomByLens[lens.id] && els.video.videoWidth ? grabGray() : null;
+  renderLenses();
+  const prev = state.lensId;
+  state.lensId = lens.id === (mainLens() && mainLens().id) ? '' : lens.id;
+  try {
+    await startCamera({ quiet: true });
+    if (!stream && prev !== state.lensId) throw new Error('lens');
+    if (before) await measureTele(lens, before);
+    writeStore();
+  } catch (err) {
+    console.warn('Модуль камери:', err);
+    state.lensId = prev;
+    toast('Не вдалося перемкнути об\'єктив');
+    await startCamera({ quiet: true });
+  } finally {
+    lensBusy = false;
+    renderLenses();
+  }
+}
+
+/** Після перемикання на телеоб'єктив порівнює кадр із кадром основної камери й запам'ятовує справжнє збільшення. */
+async function measureTele(lens, before) {
+  for (let i = 0; i < 20 && !(els.video.videoWidth && els.video.currentTime > 0.2); i++) await sleep(100);
+  await sleep(500); // автофокус і експозиція встигають вляглися
+  if (!els.video.videoWidth) return;
+  const after = grabGray(before.w);
+  if (after.w !== before.w || after.h !== before.h) return;
+  const { factor, score } = estimateZoom(before.gray, after.gray, before.w, before.h, { size: 64, shift: 3 });
+  if (score >= MIN_CONFIDENCE) state.zoomByLens[lens.id] = factor;
+}
+
 
 let lastFrameAt = 0;
 let frameWatch = false;
@@ -417,7 +569,7 @@ els.video.addEventListener('pause', () => {
 });
 els.video.addEventListener('playing', watchFrames);
 
-els.msg.addEventListener('click', startCamera);
+els.msg.addEventListener('click', () => startCamera());
 els.video.addEventListener('loadedmetadata', updateFinder);
 els.video.addEventListener('resize', updateFinder);
 // Потік не зупиняємо, коли сторінка ховається (листок «Поділитися», перемикання застосунків):
@@ -550,7 +702,7 @@ async function shoot() {
     const overlay = state.date || dev.overlay
       ? { ...dev.overlay, ...(state.date ? { dateStamp: formatDateStamp(new Date()) } : null) }
       : null;
-    const params = computeParams(camera, dev.film, frame, lut, overlay);
+    const params = computeParams(camera, dev.film, frame, lut, overlay, state.ev);
     pipeline.render(offscreen, params);
     const blob = await pipeline.toBlob('image/jpeg', 0.92);
     const thumb = await makeThumb(els.out);

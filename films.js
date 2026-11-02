@@ -32,7 +32,7 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const round4 = (v) => Math.round(v * 1e4) / 1e4;
 
 /** Плівки знімаються трохи темніше за нейтральну експозицію (EV): світла не пересвічені. */
-export const EXPOSURE_BIAS_EV = -0.2;
+export const EXPOSURE_BIAS_EV = -0.45;
 /** Піднятий чорний у кривих зменшено до цієї частки: чорні глибші. */
 export const BLACK_LIFT_SCALE = 0.3;
 /** Наскільки тіні додатково темніші (частка в найтемніших тонах, плавно зникає до півтонів). */

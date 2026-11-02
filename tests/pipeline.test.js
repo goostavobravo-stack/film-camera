@@ -203,7 +203,7 @@ test('кольорові плівки з міксом зсувають відт�
   const green = [60, 170, 70];
   const purple = FILMS.find((f) => f.id === 'lomo-purple');
   const [r, g, b] = referenceColor(green, computeParams(NEUTRAL_CAMERA, purple, NEUTRAL_FRAME));
-  assert.ok(r > green[0] + 30 && b > green[2] + 20, `зелень стає пурпурною: ${r} ${g} ${b}`);
+  assert.ok(r > green[0] + 25 && b > green[2] + 15, `зелень стає пурпурною: ${r} ${g} ${b}`);
   const red = FILMS.find((f) => f.id === 'lomo-redscale');
   const [rr, , bb] = referenceColor([120, 140, 200], computeParams(NEUTRAL_CAMERA, red, NEUTRAL_FRAME));
   assert.ok(rr > bb + 40, 'редскейл: червоне домінує над синім');
@@ -387,7 +387,7 @@ test('плівка Null не потрапляє в «Просрочку» й н�
 });
 
 test('плівки знімаються трохи темніше: зсув експозиції, чистий режим без змін', () => {
-  assert.ok(EXPOSURE_BIAS_EV < 0 && EXPOSURE_BIAS_EV >= -0.4, 'трохи, не сильно');
+  assert.ok(EXPOSURE_BIAS_EV < 0 && EXPOSURE_BIAS_EV >= -0.6, 'трохи, не сильно');
   for (const film of FILMS) {
     if (film.id === 'null') {
       assert.equal(computeParams(NEUTRAL_CAMERA, film, NEUTRAL_FRAME).exposure, 1, 'Null без зсуву');
@@ -403,6 +403,15 @@ test('плівки знімаються трохи темніше: зсув ек
   const gold = FILMS.find((f) => f.id === 'kodak-gold-200');
   const p = computeParams(NEUTRAL_CAMERA, gold, { ...NEUTRAL_FRAME, exposureEV: 0.3 });
   assert.ok(Math.abs(p.exposure - 2 ** (0.3 + EXPOSURE_BIAS_EV)) < 1e-9);
+});
+
+test('поправка експозиції користувача додається до всього, у тому числі в чистому режимі', () => {
+  const gold = FILMS.find((f) => f.id === 'kodak-gold-200');
+  const p = computeParams(NEUTRAL_CAMERA, gold, NEUTRAL_FRAME, null, null, -1);
+  assert.ok(Math.abs(p.exposure - 2 ** (EXPOSURE_BIAS_EV - 1)) < 1e-9);
+  const clean = computeParams(NEUTRAL_CAMERA, NEUTRAL_FILM, NEUTRAL_FRAME, null, null, 1 / 3);
+  assert.ok(Math.abs(clean.exposure - 2 ** (1 / 3)) < 1e-9);
+  assert.equal(computeParams(NEUTRAL_CAMERA, NEUTRAL_FILM, NEUTRAL_FRAME, null, null, 0).exposure, 1, 'нуль: без змін');
 });
 
 test('чорні глибші: піднятий чорний малий, тіні трохи темніші за пряму', () => {
