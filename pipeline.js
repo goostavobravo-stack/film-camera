@@ -163,7 +163,8 @@ export const IDENTITY_MIX = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
  * frame.flash — сила спалаху (0 = без спалаху).
  */
 export function computeParams(camera, film, frame, lutData = null, overlay = null) {
-  const exposureEV = frame.exposureEV + frame.overexposeEV;
+  // випадкова експозиція кадру, засвіт і власний зсув плівки (трохи темніше за нейтральну)
+  const exposureEV = frame.exposureEV + frame.overexposeEV + (film.exposureBias ?? 0);
   const k = frame.whiteBalanceK / 300;
   const tint = frame.whiteBalanceTint / 5;
   const sf = frame.softFocus;

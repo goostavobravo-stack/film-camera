@@ -4,7 +4,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CAMERAS, CAMERA_LIMITS, NEUTRAL_CAMERA } from '../cameras.js';
-import { FILMS, FILM_LIMITS, NEUTRAL_FILM, TINT_LIMIT, developFilm } from '../films.js';
+import {
+  BLACK_LIFT_SCALE, EXPOSURE_BIAS_EV, FILMS, FILM_LIMITS, NEUTRAL_FILM, TINT_LIMIT, TOE_DEPTH, developFilm,
+} from '../films.js';
 import { NEUTRAL_FRAME, rollFrame } from '../random.js';
 import {
   SEGMENTS, buildCurveLUT, computeParams, formatDateStamp, makeCurve, parseCube, referenceColor,
@@ -382,4 +384,37 @@ test('плівка Null не потрапляє в «Просрочку» й н�
   assert.equal(developFilm(none, 5).film, none);
   const expired = FILMS.find((f) => f.special === 'expired');
   for (let seed = 0; seed < 300; seed++) assert.notEqual(developFilm(expired, seed).info.base, 'null');
+});
+
+test('плівки знімаються трохи темніше: зсув експозиції, чистий режим без змін', () => {
+  assert.ok(EXPOSURE_BIAS_EV < 0 && EXPOSURE_BIAS_EV >= -0.4, 'трохи, не сильно');
+  for (const film of FILMS) {
+    if (film.id === 'null') {
+      assert.equal(computeParams(NEUTRAL_CAMERA, film, NEUTRAL_FRAME).exposure, 1, 'Null без зсуву');
+      continue;
+    }
+    assert.equal(film.exposureBias, EXPOSURE_BIAS_EV, film.id);
+    const p = computeParams(NEUTRAL_CAMERA, film, NEUTRAL_FRAME);
+    assert.ok(Math.abs(p.exposure - 2 ** EXPOSURE_BIAS_EV) < 1e-9, `${film.id}: ${p.exposure}`);
+    assert.ok(p.exposure < 1);
+  }
+  assert.equal(computeParams(NEUTRAL_CAMERA, NEUTRAL_FILM, NEUTRAL_FRAME).exposure, 1, 'нейтральна плівка без зсуву');
+  // зсув додається до випадкової експозиції кадру
+  const gold = FILMS.find((f) => f.id === 'kodak-gold-200');
+  const p = computeParams(NEUTRAL_CAMERA, gold, { ...NEUTRAL_FRAME, exposureEV: 0.3 });
+  assert.ok(Math.abs(p.exposure - 2 ** (0.3 + EXPOSURE_BIAS_EV)) < 1e-9);
+});
+
+test('чорні глибші: піднятий чорний малий, тіні трохи темніші за пряму', () => {
+  assert.ok(BLACK_LIFT_SCALE < 0.5 && TOE_DEPTH > 0);
+  for (const film of FILMS.filter((f) => f.id !== 'null' && !f.special)) {
+    const f = makeCurve(film.tonecurve);
+    assert.ok(f(0) > 0 && f(0) <= 0.02, `${film.id}: чорний ${f(0)}`);
+    assert.ok(f(0.1) < 0.1, `${film.id}: тіні глибші за пряму, ${f(0.1)}`);
+    assert.ok(f(0.25) < 0.25);
+  }
+  // півтони й світла майже не змінені: серединa на місці, плече лишилось
+  const gold = makeCurve(FILMS.find((f) => f.id === 'kodak-gold-200').tonecurve);
+  assert.ok(Math.abs(gold(0.5) - 0.5) < 0.03);
+  assert.ok(gold(1) < 1 && gold(0.75) > 0.75);
 });

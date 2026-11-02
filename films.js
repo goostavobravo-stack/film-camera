@@ -9,6 +9,7 @@
 // grainAmount 0–1, grainSize 0.5–2
 // halation / halationTint / halationThreshold  червоне світіння навколо світел (немає remjet-шару)
 // fog / fogTint / fogMottle  молочна вуаль (прострочена плівка), fogMottle — плямистість
+// exposureBias   зсув експозиції плівки в EV (за замовчуванням EXPOSURE_BIAS_EV); у Null і нейтральної немає
 // lut            URL файлу .cube (необов'язково); якщо файлу немає, лише криві
 // special        'expired' | 'reel': плівка складається з профілю заново для кожного кадру, див. developFilm
 
@@ -30,11 +31,31 @@ export const FILM_LIMITS = {
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const round4 = (v) => Math.round(v * 1e4) / 1e4;
 
-/** S-крива з піднятим чорним і приглушеним білим. contrast ≈ 0.5–1.2, mid зсуває середні тони. */
+/** Плівки знімаються трохи темніше за нейтральну експозицію (EV): світла не пересвічені. */
+export const EXPOSURE_BIAS_EV = -0.2;
+/** Піднятий чорний у кривих зменшено до цієї частки: чорні глибші. */
+export const BLACK_LIFT_SCALE = 0.3;
+/** Наскільки тіні додатково темніші (частка в найтемніших тонах, плавно зникає до півтонів). */
+export const TOE_DEPTH = 0.18;
+
+const smooth = (a, b, x) => {
+  const t = clamp((x - a) / (b - a), 0, 1);
+  return t * t * (3 - 2 * t);
+};
+/** Заглиблює тіні, не чіпаючи півтони й світла; зберігає монотонність кривої. */
+const deepenShadow = (y) => y * (1 - TOE_DEPTH * (1 - smooth(0, 0.45, y)));
+
+/** Заглиблює тіні готової кривої з контрольних точок. */
+function deepenCurve(points) {
+  return points.map(([x, y]) => [x, round4(deepenShadow(x === 0 ? y * BLACK_LIFT_SCALE : y))]);
+}
+
+/** S-крива з трохи піднятим чорним і приглушеним білим. contrast ≈ 0.5–1.2, mid зсуває середні тони. */
 function sCurve({ black = 0.03, white = 0.97, contrast = 0.9, mid = 0 }) {
+  const b = black * BLACK_LIFT_SCALE;
   return [0, 0.125, 0.25, 0.5, 0.75, 0.875, 1].map((x) => {
-    const y = black + (white - black) * x - contrast * 0.12 * Math.sin(2 * Math.PI * x) + mid * Math.sin(Math.PI * x);
-    return [x, round4(clamp(y, 0, 1))];
+    const y = b + (white - b) * x - contrast * 0.12 * Math.sin(2 * Math.PI * x) + mid * Math.sin(Math.PI * x);
+    return [x, round4(deepenShadow(clamp(y, 0, 1)))];
   });
 }
 
@@ -176,7 +197,7 @@ const STOCKS = [
     iso: 200,
     blurb: 'сочні зелені й блакитні, м\'які тіні',
     label: ['#1d8a43', '#f5f5f0'],
-    tonecurve: [[0, 0.03], [0.25, 0.2], [0.5, 0.5], [0.75, 0.82], [1, 0.965]],
+    tonecurve: deepenCurve([[0, 0.03], [0.25, 0.2], [0.5, 0.5], [0.75, 0.82], [1, 0.965]]),
     channelCurves: {
       r: [[0, 0], [0.5, 0.49], [1, 1]],
       g: [[0, 0.01], [0.5, 0.515], [1, 1]],
@@ -342,6 +363,7 @@ const STOCKS = [
   fog: 0,
   fogMottle: 0,
   lut: null,
+  exposureBias: EXPOSURE_BIAS_EV,
   ...f,
 }));
 
